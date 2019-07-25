@@ -7,7 +7,7 @@ import commands
 import time
 
 __all__ = ['create_time_tag', 'valid_str', 'normal', 'infor', 'warn', 'error', 'rainbow',\
-           'add_line_break', 'shuffle', 'unzip_tuple_arr', 'read_contents', 'tear_to_pieces',\
+           'add_line_break', 'shuffle', 'unzip_tuple', 'read_contents', 'tear_to_pieces',\
            'multinomial_read', 'read_vocab', 'reverse_vocab', 'convert_str_to_ids',\
            'convert_ids_to_string', 'padding_array']
 
@@ -150,6 +150,9 @@ def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, 
     return: [1, 23, 4, 455, 10]
     '''
     sen_arr = []
+    string = string.strip()
+    if (string.find(' ') > -1):
+        string = string.split(' ')
     slen = len(string)
     if (slen < 1):
         raise ValueError(error('ENCOUNTER AN EMPTY STRING.', time_tag=True, only_get=True))
@@ -216,6 +219,8 @@ def convert_ids_to_string(ids, rvocab, unk_id=0, unk='?', sos_id=1, eos_id=2, pa
             continue
         elif (sid == padding_id):
             continue
+        elif (rvocab.has_key(sid)):
+            sen += rvocab[sid]
     if (with_end):
         sen += '\n'
     return sen
@@ -229,7 +234,18 @@ def shuffle(arr):
         return arr
     return np.random.shuffle(arr)
 
-def unzip_tuple_arr(tarr):
+def split_list(arr):
+    if (len(arr) < 1):
+        raise ValueError(error('INVALID LIST.', time_tag=True, only_get=True))
+    list1, list2 = [], []
+    for item in arr:
+        if (len(item) != 2):
+            raise ValueError(error('THE ITEM IN LIST LESS THAN 2.', time_tag=True, only_get=True))
+        list1.append(item[0])
+        list2.append(item[1])
+    return list1, list2
+
+def unzip_tuple(tarr):
     '''
     unzip a typle array, e.g.:[(1,2), (3,4) ... ]
     return 2 arrays for keys & values
@@ -269,7 +285,7 @@ def read_contents(cfile='', fcode='utf-8', replace='', split=''):
             if (nr):
                 line = line.replace(replace, '')
             if (ns):
-                line = line.split(split)
+                line = tuple(line.split(split))
             lines[i] = line
     while (lines.count('') > 0):
         lines.remove('')
@@ -392,7 +408,7 @@ def __fetch_nominal_dist__(count, b):
         fetch_count += mod_dist
     return fetch_count
 
-def multinomial_read(file_dict=None, batch_size=10, fcode='utf-8', replace='', split=''):
+def multinomial_read(file_dict=None, batch_size=8, fcode='utf-8', replace='', split=''):
     '''
     * using the low time efficiency for exchanging a approximate shuffling process. *
     * we try to emulate a complete random fetch process, this random process can be improved in future days. *
@@ -409,11 +425,13 @@ def multinomial_read(file_dict=None, batch_size=10, fcode='utf-8', replace='', s
     if (len(file_group_count) != fd_len):
         raise ValueError(error('TYPE COUNT NOT EQUALS FILE GROUP COUNT.', time_tag=True, only_get=True))
     type_fetch_count = __fetch_nominal_dist__(file_group_count, batch_size)
+    print type_fetch_count
     for fdk_index in range(len(fd_keys)):
         fdk = fd_keys[fdk_index]
         fdv = file_dict[fdk]
         sub_data_count = type_fetch_count[fdk_index]
         sub_data_count_dist = np.random.multinomial(sub_data_count, [1. / len(fdv)] * len(fdv))
+        print sub_data_count_dist
         # fetch from every file.
         for ef_index in range(len(sub_data_count_dist)):
             efcount = sub_data_count_dist[ef_index]
@@ -425,10 +443,34 @@ def multinomial_read(file_dict=None, batch_size=10, fcode='utf-8', replace='', s
                 efcount = len(eflines)
             line_number = np.random.choice(len(eflines), size=efcount, replace=False)
             for ln in line_number:
-                datas.append(eflines[ln].strip())
+                datas.append(eflines[ln])
     return datas
 
 # test case
 if __name__ == '__main__':
-    newd = tear_to_pieces({'type1':'./123.txt'}, cache=10)
-    print multinomial_read(newd)
+    rainbow('TEST CASE')
+    # test huge data size
+    # newd = tear_to_pieces({'application':['./data/appfinal.txt'], 'tvchannel':['./data/channelfinal.txt'], 'personchat':['./data/chatfinal.txt'],\
+    #                        'converter':['./data/converterfinal.txt'], 'couplets':['./data/coupletfinal.txt'], 'disport':['./data/disportfinal.txt'],\
+    #                        'encyc':['./data/encycfinal.txt']}, cache=200)
+    # print '\n'.join(multinomial_read(newd, batch_size=32))
+    # test small data size
+    source_target = read_contents('./data/chat.txt', replace=' ', split='=')
+    source, target = unzip_tuple(source_target)
+    vocab = read_vocab('./data/vocab.data')
+    rvocab = reverse_vocab(vocab)
+    data, datalen = [], []
+    st = source[:8]
+    for s in st:
+        nsen, nnumber = convert_str_to_ids(s, vocab)
+        data.append(nsen)
+        datalen.append(nnumber)
+    data = padding_array(data)
+    datalen = np.array(datalen, np.int32)
+    rainbow(data)
+    rainbow(datalen)
+    print data[0].tolist()
+    rs = ''
+    rs += convert_ids_to_string(data[0].tolist(), rvocab)
+    rs += convert_ids_to_string(data[1].tolist(), rvocab)
+    rainbow(rs)
