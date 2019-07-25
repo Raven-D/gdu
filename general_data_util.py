@@ -141,6 +141,8 @@ def reverse_vocab(vocab):
             rvocab[value] = key
     return rvocab
 
+# for debug
+last = ''
 def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, eos_id=2):
     '''
     the string is a single sentence, not an array.
@@ -149,12 +151,14 @@ def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, 
     e.g.: sentence_ids = convert_str_to_ids(sentence, vocab, unk_id=0, sos=True, sos_id=1)
     return: [1, 23, 4, 455, 10]
     '''
+    global last
     sen_arr = []
     string = string.strip()
     if (string.find(' ') > -1):
         string = string.split(' ')
     slen = len(string)
     if (slen < 1):
+        print last
         raise ValueError(error('ENCOUNTER AN EMPTY STRING.', time_tag=True, only_get=True))
     if (sos):
         sen_arr.append(sos_id)
@@ -165,6 +169,7 @@ def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, 
             sen_arr.append(unk_id)
     if (eos):
         sen_arr.append(eos_id)
+    last = string
     return sen_arr, len(sen_arr)
 
 def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, np_data_type=np.int32):
@@ -232,7 +237,9 @@ def shuffle(arr):
     if (len(arr) < 2):
         warn('NO NECESSARY TO SHUFFLE.')
         return arr
-    return np.random.shuffle(arr)
+    infor('SHUFFLE DATA %d.' % len(arr))
+    np.random.shuffle(arr)
+    return arr
 
 def split_list(arr):
     if (len(arr) < 1):
@@ -446,6 +453,51 @@ def multinomial_read(file_dict=None, batch_size=8, fcode='utf-8', replace='', sp
                 datas.append(eflines[ln])
     return datas
 
+def __get_batch__(source, label, batch_size=8, index=0):
+    all_len = len(source)
+    need_shuffle = False
+    if (index == all_len):
+        index = all_len - batch_size
+        need_shuffle = True
+    start = index
+    end = start + batch_size
+    if (end > all_len):
+        end = all_len
+        need_shuffle = True
+    sbatch = source[start:end]
+    lbatch = label[start:end]
+    if (need_shuffle):
+        index = 0
+    else:
+        index += batch_size
+    return sbatch, lbatch, need_shuffle, index
+
+def get_seq2seq_batch(source, label, batch_size=8, index=0, vocab=None):
+    sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
+    enc_in_data = []
+    dec_in_data = []
+    dec_out_data = []
+    enc_in_len = []
+    dec_out_len = []
+    # convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, eos_id=2)
+    for sen in sbatch:
+        _1, _2 = convert_str_to_ids(sen, vocab, sos=True)
+        enc_in_data.append(_1)
+        enc_in_len.append(_2)
+    for sen in lbatch:
+        _1, _2 = convert_str_to_ids(sen, vocab, sos=True)
+        dec_in_data.append(_1)
+        _1, _2 = convert_str_to_ids(sen, vocab, eos=True)
+        dec_out_data.append(_1)
+        dec_out_len.append(_2)
+    # padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, np_data_type=np.int32):
+    enc_in_data = padding_array(enc_in_data)
+    dec_in_data = padding_array(dec_in_data)
+    dec_out_data = padding_array(dec_out_data)
+    enc_in_len = np.array(enc_in_len, np.int32)
+    dec_out_len = np.array(dec_out_len, np.int32)
+    return enc_in_data, enc_in_len, dec_in_data, dec_out_data, dec_out_len, need_shuffle, index
+
 # test case
 if __name__ == '__main__':
     rainbow('TEST CASE')
@@ -459,18 +511,16 @@ if __name__ == '__main__':
     source, target = unzip_tuple(source_target)
     vocab = read_vocab('./data/vocab.data')
     rvocab = reverse_vocab(vocab)
-    data, datalen = [], []
-    st = source[:8]
-    for s in st:
-        nsen, nnumber = convert_str_to_ids(s, vocab)
-        data.append(nsen)
-        datalen.append(nnumber)
-    data = padding_array(data)
-    datalen = np.array(datalen, np.int32)
-    rainbow(data)
-    rainbow(datalen)
-    print data[0].tolist()
-    rs = ''
-    rs += convert_ids_to_string(data[0].tolist(), rvocab)
-    rs += convert_ids_to_string(data[1].tolist(), rvocab)
-    rainbow(rs)
+    index = 0
+    for i in range(110 * 3):
+        eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, target, 256, index, vocab)
+        rainbow('shuffle:%r , index:%d' % (need_shuffle, index))
+        if (need_shuffle):
+            source, target = unzip_tuple(shuffle(source_target))
+        # normal('\n')
+        # normal(eid)
+        # normal(eil)
+        # normal(did)
+        # normal(dod)
+        # normal(dol)
+        # normal('\n')
