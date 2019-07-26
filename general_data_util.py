@@ -90,7 +90,7 @@ def rainbow(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    color = '\033[4' + str(np.random.randint(0, 8)) + 'm'
+    color = '\033[4' + str(np.random.randint(0, 7)) + 'm'
     info = color + info + COLOR_END
     if (only_get):
         return info
@@ -145,11 +145,18 @@ def reverse_vocab(vocab):
 last = ''
 def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, eos_id=2):
     '''
-    the string is a single sentence, not an array.
-    only support utf-8 string.
-    default value: unk_id=0, sos=False, sos_id=1, eos=False, eos_id=2
-    e.g.: sentence_ids = convert_str_to_ids(sentence, vocab, unk_id=0, sos=True, sos_id=1)
-    return: [1, 23, 4, 455, 10]
+    string: the string is a single sentence, not an array, only support utf-8 string.
+    vocab: vocab for char-to-id.
+    unk_id: <UNK> default is 0.
+    sos: whether for adding a <SOS> before string.
+    sos_id: <SOS> id in your vocab.
+    eos: whether for adding a <EOS> after string.
+    eos_id: <EOS> id in your vocab.
+    return:
+        [1, 4, 55, 354, 444]
+        or
+        [4, 55, 354, 444, 2]
+        ...
     '''
     global last
     sen_arr = []
@@ -158,7 +165,7 @@ def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, 
         string = string.split(' ')
     slen = len(string)
     if (slen < 1):
-        print last
+        infor('LAST SENTENCE: ' + last)
         raise ValueError(error('ENCOUNTER AN EMPTY STRING.', time_tag=True, only_get=True))
     if (sos):
         sen_arr.append(sos_id)
@@ -172,13 +179,13 @@ def convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, 
     last = string
     return sen_arr, len(sen_arr)
 
-def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, np_data_type=np.int32):
+def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, dtype=np.int32):
     '''
     ony support 2-d array.
-    default value: padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, np_data_type=np.int32
-    padding_type: after/before
-    e.g.: arr = padding_array(arr, padding=0, padding_id=3, convert_to_numpy=False)
-    return: [1, 23, 4, 455, 10, 3, 3, 3, 3, 3]
+    padding: the length that you want to pad, if 0, we padding array by its max length.
+    padding_id: <PAD> id in your vocab.
+    padding_type: default is 'after', unless you want to pad the supplyments with type 'before'.
+    convert_to_numpy: whether to transfer to numpy array, else will return a python list.
     '''
     max_len = -1
     if (len(arr) < 1):
@@ -202,14 +209,21 @@ def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to
             arr[i] = ar
         elif (supp < 0):
             raise ValueError(error('PADDING COUNT < 0.', time_tag=True, only_get=True))
-    return np.array(arr, np_data_type)
+    if (convert_to_numpy):
+        return np.array(arr, dtype=dtype)
+    else:
+        return arr
 
 def convert_ids_to_string(ids, rvocab, unk_id=0, unk='?', sos_id=1, eos_id=2, padding_id=3, with_end=True):
     '''
-    ids must be a 1-d array
-    rvocab is the reverse type of vocab
-    with_end determine whether to add \\n at the end of string.
-    e.g.: sen = convert_ids_to_string(ids, rvocab)
+    ids: must be a 1-d array.
+    rvocab: is the reverse type of vocab.
+    unk_id: <UNK> id in your rvocab.
+    unk: what char you want to replace for human reading.
+    sos_id: <SOS> id in your rvocab.
+    eos_id: <EOS> id in your rvocab.
+    padding_id: <PAD> id in your rvocab.
+    with_end: determine whether to add \\n at the end of string.
     '''
     sen = u''
     ilen = len(ids)
@@ -272,7 +286,7 @@ def read_contents(cfile='', fcode='utf-8', replace='', split=''):
     read all contents from file.
     if 'replace' is not empty, the 'replace' will be replaced by ''.
     e.g.: lines = read_contents('./data.txt', replace=' ', split='&')
-    NOTE: if you have mass text files to be readed, please use ''.
+    NOTE: if you have mass text files to read, please use 'multinomial_read'.
     '''
     if (cfile == ''):
         raise ValueError(error('INVALID SOURCE FILE NAME.', time_tag=True, only_get=True))
@@ -300,7 +314,7 @@ def read_contents(cfile='', fcode='utf-8', replace='', split=''):
 
 def tear_to_pieces(file_dict=None, cache=1000, teared_path='./teared'):
     '''
-    split the huge data file into many small files.
+    split the huge data file into many small file pieces.
     default: cache=1000
     file_dict e.g.:
     { 'type1': ['type1_file1', 'type1_file2' ... ],
@@ -415,7 +429,7 @@ def __fetch_nominal_dist__(count, b):
         fetch_count += mod_dist
     return fetch_count
 
-def multinomial_read(file_dict=None, batch_size=8, fcode='utf-8', replace='', split=''):
+def multinomial_read(file_dict=None, cache=1024, fcode='utf-8', replace='', split=''):
     '''
     * using the low time efficiency for exchanging a approximate shuffling process. *
     * we try to emulate a complete random fetch process, this random process can be improved in future days. *
@@ -431,14 +445,14 @@ def multinomial_read(file_dict=None, batch_size=8, fcode='utf-8', replace='', sp
         file_group_count.append(len(fdv))
     if (len(file_group_count) != fd_len):
         raise ValueError(error('TYPE COUNT NOT EQUALS FILE GROUP COUNT.', time_tag=True, only_get=True))
-    type_fetch_count = __fetch_nominal_dist__(file_group_count, batch_size)
-    print type_fetch_count
+    type_fetch_count = __fetch_nominal_dist__(file_group_count, cache)
+    # print type_fetch_count
     for fdk_index in range(len(fd_keys)):
         fdk = fd_keys[fdk_index]
         fdv = file_dict[fdk]
         sub_data_count = type_fetch_count[fdk_index]
         sub_data_count_dist = np.random.multinomial(sub_data_count, [1. / len(fdv)] * len(fdv))
-        print sub_data_count_dist
+        # print sub_data_count_dist
         # fetch from every file.
         for ef_index in range(len(sub_data_count_dist)):
             efcount = sub_data_count_dist[ef_index]
@@ -472,55 +486,74 @@ def __get_batch__(source, label, batch_size=8, index=0):
         index += batch_size
     return sbatch, lbatch, need_shuffle, index
 
-def get_seq2seq_batch(source, label, batch_size=8, index=0, vocab=None):
+# Following function is for real task reading.
+# Guys you can define your own function by contributing this project.
+
+def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, unk_id=0, sos_id=1, eos_id=2, dtype=np.int32):
     sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
     enc_in_data = []
     dec_in_data = []
     dec_out_data = []
     enc_in_len = []
     dec_out_len = []
-    # convert_str_to_ids(string, vocab, unk_id=0, sos=False, sos_id=1, eos=False, eos_id=2)
     for sen in sbatch:
-        _1, _2 = convert_str_to_ids(sen, vocab, sos=True)
+        _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, sos=True, sos_id=sos_id)
         enc_in_data.append(_1)
         enc_in_len.append(_2)
     for sen in lbatch:
-        _1, _2 = convert_str_to_ids(sen, vocab, sos=True)
+        _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, sos=True, sos_id=sos_id)
         dec_in_data.append(_1)
-        _1, _2 = convert_str_to_ids(sen, vocab, eos=True)
+        _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, eos=True, eos_id=eos_id)
         dec_out_data.append(_1)
         dec_out_len.append(_2)
-    # padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to_numpy=True, np_data_type=np.int32):
-    enc_in_data = padding_array(enc_in_data)
-    dec_in_data = padding_array(dec_in_data)
-    dec_out_data = padding_array(dec_out_data)
-    enc_in_len = np.array(enc_in_len, np.int32)
-    dec_out_len = np.array(dec_out_len, np.int32)
+    enc_in_data = padding_array(enc_in_data, dtype=dtype)
+    dec_in_data = padding_array(dec_in_data, dtype=dtype)
+    dec_out_data = padding_array(dec_out_data, dtype=dtype)
+    enc_in_len = np.array(enc_in_len, dtype=dtype)
+    dec_out_len = np.array(dec_out_len, dtype=dtype)
     return enc_in_data, enc_in_len, dec_in_data, dec_out_data, dec_out_len, need_shuffle, index
+
+def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_padding=0, sos=False, sos_id=1, dtype=np.int32):
+    sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
+    enc_in_data = []
+    enc_in_len = []
+    for sen in sbatch:
+        _1, _2 = convert_str_to_ids(sen, vocab, sos=sos, sos_id=sos_id)
+        enc_in_data.append(_1)
+        enc_in_len.append(_2)
+    label_data = [int(e) for e in label]
+    if (fix_padding == 0):
+        enc_in_data = padding_array(enc_in_data, dtype=dtype)
+    else:
+        enc_in_data = padding_array(enc_in_data, padding=fix_padding, dtype=dtype)
+    enc_in_data = np.array(enc_in_data, dtype=dtype)
+    enc_in_len = np.array(enc_in_len, dtype=dtype)
+    label_data = np.array(label_data, dtype=dtype)
+    return enc_in_data, enc_in_len, label_data, need_shuffle, index
 
 # test case
 if __name__ == '__main__':
     rainbow('TEST CASE')
-    # test huge data size
-    # newd = tear_to_pieces({'application':['./data/appfinal.txt'], 'tvchannel':['./data/channelfinal.txt'], 'personchat':['./data/chatfinal.txt'],\
-    #                        'converter':['./data/converterfinal.txt'], 'couplets':['./data/coupletfinal.txt'], 'disport':['./data/disportfinal.txt'],\
-    #                        'encyc':['./data/encycfinal.txt']}, cache=200)
-    # print '\n'.join(multinomial_read(newd, batch_size=32))
-    # test small data size
-    source_target = read_contents('./data/chat.txt', replace=' ', split='=')
-    source, target = unzip_tuple(source_target)
+    # read vocab
     vocab = read_vocab('./data/vocab.data')
     rvocab = reverse_vocab(vocab)
+    # test huge data size
+    # newd = tear_to_pieces({'application':['./data/appfinal.txt'], 'tvchannel':['./data/channelfinal.txt'], 'personchat':['./data/chatfinal.txt'],\
+    #                        'converter':['./data/converterfinal.txt'], 'couplets':['./data/coupletfinal.txt'], 'disport':['./data/disportfinal.txt']}, cache=200)
+    # for i in range(10):
+    #     source_label = multinomial_read(newd, cache=190, replace=' ', split='=')
+    #     source, label = unzip_tuple(source_label)
+    #     index = 0
+    #     need_shuffle = False
+    #     while (need_shuffle == False):
+    #         eid, eil, ld, need_shuffle, index = get_cls_batch(source=source, label=label, batch_size=8, index=index, vocab=vocab, fix_padding=40)
+        
+    # test small data size
+    source_label = read_contents('./data/chat.txt', replace=' ', split='=')
+    source, label = unzip_tuple(source_label)
     index = 0
     for i in range(110 * 3):
-        eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, target, 256, index, vocab)
+        eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, label, 256, index, vocab)
         rainbow('shuffle:%r , index:%d' % (need_shuffle, index))
         if (need_shuffle):
-            source, target = unzip_tuple(shuffle(source_target))
-        # normal('\n')
-        # normal(eid)
-        # normal(eil)
-        # normal(did)
-        # normal(dod)
-        # normal(dol)
-        # normal('\n')
+            source, label = unzip_tuple(shuffle(source_label))
