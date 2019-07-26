@@ -19,6 +19,21 @@ isfile = os.path.isfile
 
 cmd = commands.getstatusoutput
 
+# last element is control sign.
+rainbow_seq = [1, 3, 2, 6, 4, 5, 0]
+
+def loop_seq_id(num):
+    global rainbow_seq
+    if (num == 5):
+        rainbow_seq[-1] = 1
+    if (num == 0):
+        rainbow_seq[-1] = 0
+    if (rainbow_seq[-1] == 0):
+        return num + 1
+    if (rainbow_seq[-1] == 1):
+        return num - 1
+    return 0
+
 COLOR_END = '\033[0m'
 COLORS = {'fg_black': '\033[30m',\
           'fg_red': '\033[31m',\
@@ -86,11 +101,15 @@ def error(info, time_tag=False, only_get=False):
         return info
     print(info)
 
+
+rcolorid = 0
 def rainbow(info, time_tag=False, only_get=False):
+    global rcolorid, rainbow_seq
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    color = '\033[4' + str(np.random.randint(0, 7)) + 'm'
+    rcolorid = loop_seq_id(rcolorid)
+    color = '\033[4' + str(rainbow_seq[rcolorid]) + 'm'
     info = color + info + COLOR_END
     if (only_get):
         return info
