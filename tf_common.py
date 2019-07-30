@@ -15,6 +15,7 @@ swish = tf.nn.swish
 rnormal = tf.random_normal
 runiform = tf.random_uniform
 layer = tf.layers
+l2_loss = tf.nn.l2_loss
 
 # _sentinel=None, labels=None, logits=None, dim=-1, name=None
 ce = tf.nn.softmax_cross_entropy_with_logits_v2
@@ -26,7 +27,7 @@ mse = tf.losses.mean_squared_error
 __all__ = ['tanh', 'relu', 'relu6', 'sigmoid', 'softsign', 'softplus', 'swish', 'rnormal', 'runiform',\
            'layer', 'ce', 'se', 'mse', 'l2n', 'softmax', 'lrelu', 'get_init', 'random_embeddings',\
            'gru', 'uni_gru', 'bi_gru', 'conv2d', 'sepconv2d', 'maxpool2d', 'avgpool2d', 'dense', 'dropout',\
-           'moments', 'gclip', 'load_model']
+           'moments', 'gclip', 'load_model', 'selfatt', 'emb_lookup', 'l2_loss']
 
 __all_anno__ = ['function tanh from tensorflow without modification.',\
                 'function relu from tensorflow without modification.',\
@@ -57,7 +58,10 @@ __all_anno__ = ['function tanh from tensorflow without modification.',\
                 'create a dropout operation.',\
                 'to calc the means and variances for tensor.',\
                 'clip the gradients by specific norm value.',\
-                'to chech whether need to load existed ckpt file.']
+                'to chech whether need to load existed ckpt file.',\
+                'a simple self-attention impl.',\
+                'simple ref for tf.nn.embedding_lookup.',\
+                'simple ref for tf.nn.l2_loss.']
 
 def flist():
     '''
@@ -96,16 +100,16 @@ def gru(num_units, ac=tanh, dropout=0.1, mode='train', res=False):
     gru = tf.contrib.rnn.GRUCell(num_units, activation=ac)
     if (dropout > 0.0 and dropout < 1.0):
         gru = tf.contrib.rnn.DropoutWrapper(cell=gru, input_keep_prob=(1.0 - dropout))
-    if (residual):
+    if (res):
         gru = tf.contrib.rnn.ResidualWrapper(gru)
-    g.infor('|  CREATE GRU UNITS:%d DROPOUT:%.2f RESIDUAL:%r  |' % (num_units, dropout, residual))
+    g.infor('|  CREATE GRU UNITS:%d DROPOUT:%.2f RESIDUAL:%r  |' % (num_units, dropout, res))
     return gru
 
 def uni_gru(num_units, num_layers, ac=tanh, dropout=0.1, mode='train', resc=0):
     gru_list = []
     for i in range(num_layers):
-        gru = GRU(num_units, ac, dropout, mode, res=(i >= (num_layers - resc)))
-        gru_list.append(gru)
+        gru_cell = gru(num_units, ac, dropout, mode, res=(i >= (num_layers - resc)))
+        gru_list.append(gru_cell)
     if (len(gru_list) == 1):
         return gru_list[0]
     else:
@@ -136,6 +140,24 @@ def dropout(rate=0.1, name=None):
 
 def moments(x, axes=-1, keep_dims=False):
     return tf.nn.moments(x=x, axes=axes, keep_dims=keep_dims)
+
+def emb_lookup(emb, source):
+    return tf.nn.embedding_lookup(emb, source)
+
+def selfatt(x, att_size, dropout_rate=0.1):
+    xshape = tf.shape(x)
+    q = dense(att_size)(x)
+    k = dense(att_size)(x)
+    v = dense(att_size)(x)
+    s = tf.matmul(q, k, transpose_b=True)
+    s = tf.multiply(s, 1.0 / tf.sqrt(tf.cast(att_size, tf.float32)))
+    s = tf.nn.softmax(s, -1)
+    result = dropout(rate=dropout_rate)(tf.matmul(s, v))
+    return result
+
+def l2_reg(rate=0.0005):
+    params = tf.trainable_variables()
+    return tf.reduce_sum([l2_loss(v) for v in params]) * rate
 
 def gclip(gradients, maxn=3.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
