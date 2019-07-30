@@ -219,6 +219,7 @@ def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to
         raise ValueError(error('CAN NOT GET A VALID MAX LENGTH FOR SUB ERROR.', time_tag=True, only_get=True))
     for i in range(len(arr)):
         ar = arr[i]
+        ar = ar[:max_len]
         supp = max_len - len(ar)
         if (supp > 0):
             if (padding_type == 'after'):

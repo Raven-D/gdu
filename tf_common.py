@@ -167,7 +167,7 @@ def gclip(gradients, maxn=3.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
     return clipped_gradients
 
-def load_model(model, model_dir, session, name):
+def load_model(model, model_dir, session):
     latest_ckpt = tf.train.latest_checkpoint(model_dir)
     gi = tf.global_variables_initializer()
     if latest_ckpt:
