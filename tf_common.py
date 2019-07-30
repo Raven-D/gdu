@@ -103,6 +103,7 @@ def gru(num_units, ac=tanh, dropout=0.1, mode='train', res=False):
     if (res):
         gru = tf.contrib.rnn.ResidualWrapper(gru)
     g.infor('|  CREATE GRU UNITS:%d DROPOUT:%.2f RESIDUAL:%r  |' % (num_units, dropout, res))
+    g.infor('GRU DROPOUT:%.2f' % dropout)
     return gru
 
 def uni_gru(num_units, num_layers, ac=tanh, dropout=0.1, mode='train', resc=0):
@@ -144,7 +145,10 @@ def moments(x, axes=-1, keep_dims=False):
 def emb_lookup(emb, source):
     return tf.nn.embedding_lookup(emb, source)
 
-def selfatt(x, att_size, dropout_rate=0.1):
+def selfatt(x, att_size, dropout_rate=0.1, mode='train'):
+    if (mode != 'train'):
+        dropout_rate = 0.0
+    g.infor('SELFATT DROPOUT:%.2f' % dropout_rate)
     xshape = tf.shape(x)
     q = dense(att_size)(x)
     k = dense(att_size)(x)
