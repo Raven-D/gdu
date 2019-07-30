@@ -115,3 +115,9 @@ If you choose the logging 'rainbow' it will looks like as follow:
 ![image](http://wx1.sinaimg.cn/large/65bb9c9cly1g5d2w5869vj21fq0faanu.jpg)
 
 ### LUCKY FOR YOU.
+
+----
+
+### tc_common is a module for conveniently ref tensorflow base functions.
+
+##### It will includes more and more high ensemble 'prevailing block', hold expectations pls.
