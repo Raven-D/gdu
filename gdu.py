@@ -1,10 +1,15 @@
 # coding=utf-8
-
 import codecs as co
 import os
+import sys
 import numpy as np
 import commands
 import time
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError, e:
+    print e
 
 __all__ = ['create_time_tag', 'valid_str', 'normal', 'infor', 'warn', 'error', 'rainbow',\
            'add_line_break', 'shuffle', 'unzip_tuple', 'read_contents', 'tear_to_pieces',\
@@ -541,7 +546,7 @@ def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_pa
         _1, _2 = convert_str_to_ids(sen, vocab, sos=sos, sos_id=sos_id)
         enc_in_data.append(_1)
         enc_in_len.append(_2)
-    label_data = [int(e) for e in label]
+    label_data = [int(e) for e in lbatch]
     if (fix_padding == 0):
         enc_in_data = padding_array(enc_in_data, dtype=dtype)
     else:
@@ -551,8 +556,52 @@ def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_pa
     label_data = np.array(label_data, dtype=dtype)
     return enc_in_data, enc_in_len, label_data, need_shuffle, index
 
-# test case
-if __name__ == '__main__':
+def writef(fname='', value='', mode='a', fcode='utf-8'):
+    if (fname == '' or value == ''):
+        raise ValueError(error('INVALID FILENAME OR VALUE.', time_tag=True, only_get=True))
+    with co.open(fname, mode, fcode) as wf:
+        value = valid_str(value)
+        if (not value.endswith('\n')):
+            value += '\n'
+        wf.write(value)
+        wf.flush()
+
+records = {}
+def record(key='', value=np.inf, limit=1000):
+    global record
+    if (key == '' or value == np.inf):
+        raise ValueError(error('INVALID KEY OR VALUE IN RECORD.', time_tag=True, only_get=True))
+    if (not record.has_key(key)):
+        record[key] = []
+    else:
+        record[key].append(value)
+    if (len(record[key]) == limit):
+        mean = np.mean(record[key])
+        writef(key, valid_str(mean))
+        record[key] = []
+
+def draw_diagram(key='', color='k-', lw=2):
+    if (key == ''):
+        raise ValueError(error('INVALID KEY WHEN DRAW DIAGRAM.', time_tag=True, only_get=True))
+    try:
+        datas = co.open(key, 'r', 'utf-8').readlines()
+        ndatas = []
+        for d in datas:
+            d = d.strip()
+            if (d != ''):
+                try:
+                    ndatas.append(float(d))
+                except ValueError:
+                    raise ValueError(error('INVALID FLOAT NUMBER.', time_tag=True, only_get=True))
+        del datas
+        if (len(ndatas) != 0):
+            plt.figure(figsize=(22,12))
+            plt.plot(range(1, len(ndatas) + 1), ndatas, color, lw=lw)
+            plt.show()
+    except IOError:
+        raise ValueError(error('NO VALID FILE FOUND (%s).' % key, time_tag=True, only_get=True))
+
+def test_case():
     rainbow('TEST CASE')
     # read vocab
     vocab = read_vocab('./data/vocab.data')
@@ -572,8 +621,14 @@ if __name__ == '__main__':
     source_label = read_contents('./data/chat.txt', replace=' ', split='=')
     source, label = unzip_tuple(source_label)
     index = 0
-    for i in range(110 * 3):
+    for i in range(500):
         eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, label, 256, index, vocab)
         rainbow('shuffle:%r , index:%d' % (need_shuffle, index))
         if (need_shuffle):
             source, label = unzip_tuple(shuffle(source_label))
+
+if __name__ == '__main__':
+    argv = sys.argv
+    if (len(argv) == 2):
+        diagram = argv[1]
+        draw_diagram(diagram)
