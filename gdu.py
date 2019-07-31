@@ -6,11 +6,6 @@ import numpy as np
 import commands
 import time
 
-try:
-    import matplotlib.pyplot as plt
-except ImportError, e:
-    print e
-
 __all__ = ['create_time_tag', 'valid_str', 'normal', 'infor', 'warn', 'error', 'rainbow',\
            'add_line_break', 'shuffle', 'unzip_tuple', 'read_contents', 'tear_to_pieces',\
            'multinomial_read', 'read_vocab', 'reverse_vocab', 'convert_str_to_ids',\
@@ -120,6 +115,11 @@ def rainbow(info, time_tag=False, only_get=False):
         return info
     print(info)
     
+
+try:
+    import matplotlib.pyplot as plt
+except ImportError, e:
+    warn(e)
 
 def add_line_break(lines):
     '''
@@ -301,7 +301,11 @@ def unzip_tuple(tarr):
     keys = []
     values = []
     for titem in tarr:
-        k,v = titem
+        try:
+            k,v = titem
+        except ValueError:
+            error('UNZIP ERROR, ' + str(titem))
+            sys.exit(0)
         keys.append(k)
         values.append(v)
     return keys, values
@@ -568,17 +572,17 @@ def writef(fname='', value='', mode='a', fcode='utf-8'):
 
 records = {}
 def record(key='', value=np.inf, limit=1000):
-    global record
+    global records
     if (key == '' or value == np.inf):
         raise ValueError(error('INVALID KEY OR VALUE IN RECORD.', time_tag=True, only_get=True))
-    if (not record.has_key(key)):
-        record[key] = []
+    if (not records.has_key(key)):
+        records[key] = []
     else:
-        record[key].append(value)
-    if (len(record[key]) == limit):
-        mean = np.mean(record[key])
+        records[key].append(value)
+    if (len(records[key]) == limit):
+        mean = np.mean(records[key])
         writef(key, valid_str(mean))
-        record[key] = []
+        records[key] = []
 
 def draw_diagram(key='', color='k-', lw=2):
     if (key == ''):
