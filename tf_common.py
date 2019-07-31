@@ -27,7 +27,7 @@ mse = tf.losses.mean_squared_error
 __all__ = ['tanh', 'relu', 'relu6', 'sigmoid', 'softsign', 'softplus', 'swish', 'rnormal', 'runiform',\
            'layer', 'ce', 'se', 'mse', 'l2n', 'softmax', 'lrelu', 'get_init', 'random_embeddings',\
            'gru', 'uni_gru', 'bi_gru', 'conv2d', 'sepconv2d', 'maxpool2d', 'avgpool2d', 'dense', 'dropout',\
-           'moments', 'gclip', 'load_model', 'selfatt', 'emb_lookup', 'l2_loss']
+           'moments', 'gclip', 'load_model', 'selfatt', 'emb_lookup', 'l2_reg', 'luong_att', 'luong_att']
 
 __all_anno__ = ['function tanh from tensorflow without modification.',\
                 'function relu from tensorflow without modification.',\
@@ -61,7 +61,9 @@ __all_anno__ = ['function tanh from tensorflow without modification.',\
                 'to chech whether need to load existed ckpt file.',\
                 'a simple self-attention impl.',\
                 'simple ref for tf.nn.embedding_lookup.',\
-                'simple ref for tf.nn.l2_loss.']
+                'simple ref for tf.nn.l2_loss.',\
+                'luong and sluong attention mechanism builder.',\
+                'bahdanau and normed bahdanau attention mechanism builder.']
 
 def flist():
     '''
@@ -162,6 +164,14 @@ def selfatt(x, att_size, dropout_rate=0.1, mode='train'):
 def l2_reg(rate=0.0005):
     params = tf.trainable_variables()
     return tf.reduce_sum([l2_loss(v) for v in params]) * rate
+
+def luong_att(cell, units, memory, seq_len, scaled=False, align_history=False, name='luong_attention'):
+    att = tf.contrib.seq2seq.LuongAttention(units, memory, memory_sequence_length=seq_len, scale=scaled)
+    return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
+
+def bahdanau_att(cell, units, memory, seq_len, normed=False, align_history=False, name='bahdanau_attention'):
+    att = tf.contrib.seq2seq.BahdanauAttention(units, memory, memory_sequence_length=seq_len, normalize=normed)
+    return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
 
 def gclip(gradients, maxn=3.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
