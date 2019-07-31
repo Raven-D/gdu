@@ -171,7 +171,7 @@ def load_model(model, model_dir, session):
     latest_ckpt = tf.train.latest_checkpoint(model_dir)
     gi = tf.global_variables_initializer()
     if latest_ckpt:
-        model = model.saver.restore(session, latest_ckpt)
+        model.saver.restore(session, latest_ckpt)
     else:
         session.run(gi)
         g.rainbow('CREATE NEW MODEL...')
