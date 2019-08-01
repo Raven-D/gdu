@@ -542,14 +542,16 @@ def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, un
     dec_out_len = np.array(dec_out_len, dtype=dtype)
     return enc_in_data, enc_in_len, dec_in_data, dec_out_data, dec_out_len, need_shuffle, index
 
-def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_padding=0, sos=False, sos_id=1, dtype=np.int32):
+def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_padding=0, sos=False, sos_id=1, dtype=np.int32, need_osen=False):
     sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
     enc_in_data = []
     enc_in_len = []
+    original_sen = []
     for sen in sbatch:
         _1, _2 = convert_str_to_ids(sen, vocab, sos=sos, sos_id=sos_id)
         enc_in_data.append(_1)
         enc_in_len.append(_2)
+        original_sen.append(sen)
     label_data = [int(e) for e in lbatch]
     if (fix_padding == 0):
         enc_in_data = padding_array(enc_in_data, dtype=dtype)
@@ -558,13 +560,17 @@ def get_cls_batch(source=[], label=[], batch_size=8, index=0, vocab=None, fix_pa
     enc_in_data = np.array(enc_in_data, dtype=dtype)
     enc_in_len = np.array(enc_in_len, dtype=dtype)
     label_data = np.array(label_data, dtype=dtype)
-    return enc_in_data, enc_in_len, label_data, need_shuffle, index
+    if (need_osen):
+        return enc_in_data, enc_in_len, label_data, need_shuffle, index, original_sen
+    else:
+        del original_sen
+        return enc_in_data, enc_in_len, label_data, need_shuffle, index
 
 def writef(fname='', value='', mode='a', fcode='utf-8'):
     if (fname == '' or value == ''):
         raise ValueError(error('INVALID FILENAME OR VALUE.', time_tag=True, only_get=True))
     with co.open(fname, mode, fcode) as wf:
-        value = valid_str(value)
+        # value = valid_str(value)
         if (not value.endswith('\n')):
             value += '\n'
         wf.write(value)
