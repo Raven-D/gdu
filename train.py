@@ -78,7 +78,7 @@ def infer():
                 if (res[0][0] == ld[0]):
                     acc += 1.
                 if (need_shuffle):
-                    braek;
+                    break;
             g.rainbow('INDEX:%d ACC:%.4f' % (index, acc))
 
 if __name__ == '__main__':
