@@ -121,3 +121,12 @@ If you choose the logging 'rainbow' it will looks like as follow:
 ### tc_common is a module for conveniently ref tensorflow base functions.
 
 ##### It will includes more and more high ensemble 'prevailing block', hold expectations pls.
+
+----
+
+## [VOCAB]
+
+##### bvocab.data is the biggest vocab, chars - 21780
+##### mvocab.data is the medium size vocab, chars - 17429
+##### smvocab.data is the medium size vocab which less than mvocab.data, chars - 10509
+##### svocab.data is the smallest size vocab, chars - 6689
