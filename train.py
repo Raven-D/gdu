@@ -87,8 +87,8 @@ def infer():
                 if (i > 0 and i % 100 == 0):
                     prog_percent = (i + 1) / float(len(source_label)) * 100.
                     acp = int(err / prog_percent)
-                    g.scolor('  =>  PROGRESS:%.4f [All count prediction: %d] ' % (prog_percent, acp), color='bg_green')
-            g.rainbow('INDEX:%d ACC:%.4f' % (index, acc / float(len(source_label))))
+                    g.scolor('  =>  PROGRESS:%.2f%% [All count prediction: %d] ' % (prog_percent, acp), color='bg_green')
+            g.rainbow('INDEX:%d ACC:%.4f%%' % (index, acc / float(len(source_label)) * 100))
 
 if __name__ == '__main__':
     argv = sys.argv
