@@ -8,21 +8,21 @@ import tf_common as tc
 tf = tc.tf
 
 PARAM = {'lr': 0.0005,\
-         'lr_drate': 0.995,\
+         'lr_drate': 0.9925,\
          'lr_dstep':1000,\
          'lr_dlimit':0.0001,\
          'l2_rate': 1e-3,\
-         'emb_size': 64,\
-         'source_vocab_size':7819,\
+         'emb_size': 128,\
+         'source_vocab_size':10511,\
          'gru_layers':2,\
-         'cls_num':31}
+         'cls_num':27}
 
 MODEL_DIR = './models'
 VOCAB = './data/vocab.data'
 DATA = './data/cls.data'
 TRAIN_STEP = 1000000
-BATCH_SIZE = 32
-SAVING_STEP = 1000
+BATCH_SIZE = 27 * 2
+SAVING_STEP = 10000
 
 def train():
     # begin graph
@@ -72,14 +72,23 @@ def infer():
             source, label = g.unzip_tuple(source_label)
             index = 0
             acc = 0.0
+            err = 0.0
             for i in range(len(source_label)):
-                eid, eil, ld, need_shuffle, index = g.get_cls_batch(source=source, label=label, batch_size=1, index=index, vocab=vocab)
+                eid, eil, ld, need_shuffle, index, osen = g.get_cls_batch(source=source, label=label, batch_size=1, index=index, vocab=vocab, need_osen=True)
                 res = model.infer(sess, [eid, eil])
                 if (res[0][0] == ld[0]):
                     acc += 1.
+                else:
+                    evalue = osen[0] + ':' + str(res[0][0]) + ' / ' + str(ld[0])
+                    g.writef('evalue', evalue)
+                    err += 1
                 if (need_shuffle):
                     break;
-            g.rainbow('INDEX:%d ACC:%.4f' % (index, acc))
+                if (i > 0 and i % 1000 == 0):
+                    prog_percent = (i + 1) / float(len(source_label)) * 100.
+                    acp = int(err / prog_percent)
+                    g.scolor('  =>  PROGRESS:%.2f [All count prediction: %d] ' % (prog_percent, acp), color='bg_green')
+            g.rainbow('INDEX:%d ACC:%.4f' % (index, acc / float(len(source_label))))
 
 if __name__ == '__main__':
     argv = sys.argv

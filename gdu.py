@@ -101,6 +101,14 @@ def error(info, time_tag=False, only_get=False):
         return info
     print(info)
 
+def scolor(info, color='bg_blue', time_tag=False, only_get=False):
+    info = valid_str(info)
+    if (time_tag):
+        info = create_time_tag() + info
+    info = COLORS[color] + info + COLOR_END
+    if (only_get):
+        return info
+    print(info)
 
 rcolorid = 0
 def rainbow(info, time_tag=False, only_get=False):
