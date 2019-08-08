@@ -17,6 +17,8 @@ runiform = tf.random_uniform
 layer = tf.layers
 l2_loss = tf.nn.l2_loss
 
+# _sentinel=None, labels=None, logits=None, name=None
+sce = tf.nn.sparse_softmax_cross_entropy_with_logits
 # _sentinel=None, labels=None, logits=None, dim=-1, name=None
 ce = tf.nn.softmax_cross_entropy_with_logits_v2
 # _sentinel=None, labels=None, logits=None, name=None
@@ -161,8 +163,11 @@ def selfatt(x, att_size, dropout_rate=0.1, mode='train'):
     result = dropout(rate=dropout_rate)(tf.matmul(s, v))
     return result
 
-def l2_reg(rate=0.0005):
-    params = tf.trainable_variables()
+def l2_reg(rate=0.0005, scope=''):
+    if (scope == ''):
+        params = tf.trainable_variables()
+    else:
+        params = get_scope(scope)
     return tf.reduce_sum([l2_loss(v) for v in params]) * rate
 
 def luong_att(cell, units, memory, seq_len, scaled=False, align_history=False, name='luong_attention'):
@@ -188,3 +193,21 @@ def load_model(model, model_dir, session):
 
     global_step = model.global_step.eval(session=session)
     return model, global_step
+
+def flat(x, name='flat'):
+    '''
+    Flat up to 2 layers of iterable elements.
+    '''
+    r = []
+    tx = type(x)
+    for e1 in x:
+        tex = type(e1)
+        if (tex == list or tex == tuple):
+            for e2 in e1:
+                r.append(e2)
+        else:
+            r.append(e1)
+    return tf.identity(r, name)
+
+def get_scope(scope=''):
+    return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
