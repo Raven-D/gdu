@@ -35,6 +35,7 @@ def loop_seq_id(num):
     return 0
 
 COLOR_END = '\033[0m'
+COLOR_END_UN = '\033[4m'
 COLORS = {'fg_black': '\033[30m',\
           'fg_red': '\033[31m',\
           'fg_green': '\033[32m',\
@@ -101,11 +102,21 @@ def error(info, time_tag=False, only_get=False):
         return info
     print(info)
 
-def scolor(info, color='bg_blue', time_tag=False, only_get=False):
+def scolor(info, color='bg_blue', unl=False, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS[color] + info + COLOR_END
+    info = COLORS[color] + info + (COLOR_END_UN if unl else COLOR_END)
+    if (only_get):
+        return info
+    print(info)
+
+def lrandom(info , time_tag=False, only_get=False):
+    info = valid_str(info)
+    if (time_tag):
+        info = create_time_tag() + info
+    ckeys = COLORS.keys()
+    info = COLORS[ckeys[np.random.randint(0, len(ckeys))]] + info + (COLOR_END if np.random.randint(0,2) == 1 else COLOR_END_UN)
     if (only_get):
         return info
     print(info)
@@ -526,7 +537,8 @@ def __get_batch__(source, label, batch_size=8, index=0):
 # Following function is for real task reading.
 # Guys you can define your own function by contributing this project.
 
-def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, unk_id=0, sos_id=1, eos_id=2, dtype=np.int32):
+def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, unk_id=0, sos_id=1, eos_id=2, dtype=np.int32,\
+                      rmask=False, rmask_prob=0.15, rmask_uc=0.2):
     sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
     enc_in_data = []
     dec_in_data = []
@@ -543,6 +555,17 @@ def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, un
         _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, eos=True, eos_id=eos_id)
         dec_out_data.append(_1)
         dec_out_len.append(_2)
+    if (rmask):
+        p = np.random.randint(1, 101)
+        if (p <= 100 * int(rmask_prob)):
+            # minus the SOS tag
+            eid_len = len(enc_in_data) - 1
+            eid_len_mask = int(eid_len * rmask_uc)
+            if (int(eid_len_mask) > 0):
+                _rid_ = np.random.randint(4, len(vocab), [eid_len_mask])
+                _rid_idx_ = np.random.randint(1, eid_len + 1, [eid_len_mask])
+                for i in range(eid_len_mask):
+                    enc_in_data[_rid_idx_[i]] = _rid_[i]
     enc_in_data = padding_array(enc_in_data, dtype=dtype)
     dec_in_data = padding_array(dec_in_data, dtype=dtype)
     dec_out_data = padding_array(dec_out_data, dtype=dtype)
