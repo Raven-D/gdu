@@ -149,7 +149,7 @@ def moments(x, axes=-1, keep_dims=False):
 def emb_lookup(emb, source):
     return tf.nn.embedding_lookup(emb, source)
 
-def selfatt(x, att_size, dropout_rate=0.1, mode='train'):
+def selfatt(x, att_size, dropout_rate=0.1, res=True, mode='train'):
     if (mode != 'train'):
         dropout_rate = 0.0
     g.infor('SELFATT DROPOUT:%.2f' % dropout_rate)
@@ -161,7 +161,10 @@ def selfatt(x, att_size, dropout_rate=0.1, mode='train'):
     s = tf.multiply(s, 1.0 / tf.sqrt(tf.cast(att_size, tf.float32)))
     s = tf.nn.softmax(s, -1)
     result = dropout(rate=dropout_rate)(tf.matmul(s, v))
-    return result
+    if (res):
+        return result + x
+    else:
+        return result
 
 def l2_reg(rate=0.0005, scope=''):
     if (scope == ''):
@@ -189,7 +192,7 @@ def load_model(model, model_dir, session):
         model.saver.restore(session, latest_ckpt)
     else:
         session.run(gi)
-        g.rainbow('CREATE NEW MODEL...')
+        g.lrandom('CREATE NEW MODEL...')
 
     global_step = model.global_step.eval(session=session)
     return model, global_step
