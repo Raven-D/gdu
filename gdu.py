@@ -279,7 +279,7 @@ def convert_ids_to_string(ids, rvocab, unk_id=0, unk='?', sos_id=1, eos_id=2, pa
         elif (sid == sos_id):
             continue
         elif (sid == eos_id):
-            continue
+            sen += ' <end> '
         elif (sid == padding_id):
             continue
         elif (rvocab.has_key(sid)):
@@ -518,20 +518,18 @@ def multinomial_read(file_dict=None, cache=1024, fcode='utf-8', replace='', spli
 def __get_batch__(source, label, batch_size=8, index=0):
     all_len = len(source)
     need_shuffle = False
-    if (index == all_len):
-        index = all_len - batch_size
-        need_shuffle = True
     start = index
     end = start + batch_size
     if (end > all_len):
-        end = all_len
         need_shuffle = True
-    sbatch = source[start:end]
-    lbatch = label[start:end]
     if (need_shuffle):
+        start = (all_len - batch_size)
+        end = start + batch_size
         index = 0
     else:
         index += batch_size
+    sbatch = source[start:end]
+    lbatch = label[start:end]
     return sbatch, lbatch, need_shuffle, index
 
 # Following function is for real task reading.

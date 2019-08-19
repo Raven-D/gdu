@@ -75,8 +75,19 @@ def flist():
     for f in zip(__all__, __all_anno__):
         g.normal(f)
 
+def gelu(x):
+    cdf = 0.5 * (1.0 + tf.tanh((np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
+    return x * cdf
+
+def ngelu(x):
+    x = gelu(x)
+    return tf.contrib.layers.layer_norm(inputs=x, begin_norm_axis=-1, begin_params_axis=-1)
+
 def l2n(x, axis=-1):
     return tf.nn.l2_normalize(x, axis=axis)
+
+def norm(x, axis=-1):
+    return tf.contrib.layers.layer_norm(inputs=x, begin_norm_axis=-1, begin_params_axis=-1)
 
 def softmax(x, axis=-1):
     return tf.nn.softmax(x, axis=axis)
@@ -97,7 +108,7 @@ def random_embeddings(vocab_size=None, embedding_size=None, scope_name='default_
             embedding_coder = tf.get_variable(v_scope_name, [vocab_size, embedding_size], dtype)
     return embedding_coder
 
-def gru(num_units, ac=tanh, dropout=0.1, mode='train', res=False):
+def gru(num_units, ac=tanh, dropout=0.0, mode='train', res=False):
     if (mode != 'train'):
         dropout = 0.0
     gru = None
@@ -110,7 +121,7 @@ def gru(num_units, ac=tanh, dropout=0.1, mode='train', res=False):
     g.infor('GRU DROPOUT:%.2f' % dropout)
     return gru
 
-def uni_gru(num_units, num_layers, ac=tanh, dropout=0.1, mode='train', resc=0):
+def uni_gru(num_units, num_layers, ac=tanh, dropout=0.0, mode='train', resc=0):
     gru_list = []
     for i in range(num_layers):
         gru_cell = gru(num_units, ac, dropout, mode, res=(i >= (num_layers - resc)))
@@ -120,7 +131,7 @@ def uni_gru(num_units, num_layers, ac=tanh, dropout=0.1, mode='train', resc=0):
     else:
         return tf.contrib.rnn.MultiRNNCell(gru_list)
 
-def bi_gru(num_units, num_layers, ac=tanh, dropout=0.1, mode='train', resc=0):
+def bi_gru(num_units, num_layers, ac=tanh, dropout=0.0, mode='train', resc=0):
     fw_gru_list = uni_gru(num_units, num_layers, ac, dropout, mode, resc)
     bw_gru_list = uni_gru(num_units, num_layers, ac, dropout, mode, resc)
     return fw_gru_list, bw_gru_list
@@ -149,7 +160,7 @@ def moments(x, axes=-1, keep_dims=False):
 def emb_lookup(emb, source):
     return tf.nn.embedding_lookup(emb, source)
 
-def selfatt(x, att_size, dropout_rate=0.1, res=True, mode='train'):
+def selfatt(x, att_size, dropout_rate=0.0, res=True, mode='train'):
     if (mode != 'train'):
         dropout_rate = 0.0
     g.infor('SELFATT DROPOUT:%.2f' % dropout_rate)
@@ -181,9 +192,9 @@ def bahdanau_att(cell, units, memory, seq_len, normed=False, align_history=False
     att = tf.contrib.seq2seq.BahdanauAttention(units, memory, memory_sequence_length=seq_len, normalize=normed)
     return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
 
-def gclip(gradients, maxn=3.0):
+def gclip(gradients, maxn=1.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
-    return clipped_gradients
+    return clipped_gradients, gradient_norm
 
 def load_model(model, model_dir, session):
     latest_ckpt = tf.train.latest_checkpoint(model_dir)
@@ -192,7 +203,7 @@ def load_model(model, model_dir, session):
         model.saver.restore(session, latest_ckpt)
     else:
         session.run(gi)
-        g.lrandom('CREATE NEW MODEL...')
+        g.infor('CREATE NEW MODEL...')
 
     global_step = model.global_step.eval(session=session)
     return model, global_step
