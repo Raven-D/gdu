@@ -74,7 +74,7 @@ def normal(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['fg_white'] + info + COLOR_END
+    info = COLORS['fg_white'] + COLORS['bg_black'] + u'\u25e5 ' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -83,7 +83,7 @@ def infor(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['fg_blue'] + info + COLOR_END
+    info = COLORS['fg_white'] + COLORS['bg_blue'] + u'\u272a ' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -92,7 +92,7 @@ def warn(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['bg_yellow'] + info + COLOR_END
+    info = COLORS['fg_black'] + COLORS['bg_yellow'] + u'\u3013' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -101,7 +101,7 @@ def error(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['bg_red'] + info + COLOR_END
+    info = COLORS['fg_white'] + COLORS['bg_red'] + u'\u2689 ' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -110,7 +110,7 @@ def scolor(info, color='bg_blue', unl=False, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS[color] + info + (COLOR_END_UN if unl else COLOR_END)
+    info = COLORS[color] + u'\u2663 ' + info + (COLOR_END_UN if unl else COLOR_END)
     if (only_get):
         return info
     print(info)
@@ -120,7 +120,7 @@ def lrandom(info , time_tag=False, only_get=False):
     if (time_tag):
         info = create_time_tag() + info
     ckeys = COLORS.keys()
-    info = COLORS[ckeys[np.random.randint(0, len(ckeys))]] + info + (COLOR_END if np.random.randint(0,2) == 1 else COLOR_END_UN)
+    info = COLORS[ckeys[np.random.randint(0, len(ckeys))]] + u'\u273f ' + info + (COLOR_END if np.random.randint(0,2) == 1 else COLOR_END_UN)
     if (only_get):
         return info
     print(info)
