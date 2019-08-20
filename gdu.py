@@ -6,6 +6,10 @@ import numpy as np
 import commands
 import time
 
+# valid str , utf8, 20 ~ 40869
+CHAR_CODE_BEGIN = 20
+CHAR_CODE_END = 40869 + 1
+
 __all__ = ['create_time_tag', 'valid_str', 'normal', 'infor', 'warn', 'error', 'rainbow',\
            'add_line_break', 'shuffle', 'unzip_tuple', 'read_contents', 'tear_to_pieces',\
            'multinomial_read', 'read_vocab', 'reverse_vocab', 'convert_str_to_ids',\
@@ -295,9 +299,121 @@ def shuffle(arr):
     if (len(arr) < 2):
         warn('NO NECESSARY TO SHUFFLE.')
         return arr
-    infor('SHUFFLE DATA %d.' % len(arr))
     np.random.shuffle(arr)
+    infor('SHUFFLE DATA %d.' % len(arr))
     return arr
+
+jieba = None
+try:
+    import jieba
+except ImportError, e:
+    warn(e)
+
+def fabn(x):
+    if (len(x) < 1):
+        raise ValueError(error('NO ELEMENT FOUND(fabn).', time_tag=True, only_get=True))
+    nx = []
+    for i in range(len(x)):
+        nx.append(sum(x[:i + 1]))
+    return nx
+
+def get_section(e, arr):
+    if (len(arr) < 1):
+        raise ValueError(error('NO ELEMENT FOUND(get_section).', time_tag=True, only_get=True))
+    index = 0
+    for i in range(len(arr)):
+        ai = arr[i]
+        if (e <= ai):
+            break
+        index += 1
+    return index
+
+
+CCHAR_RATE = 0.25
+RCHAR_RATE = 0.25
+RWORD_RATE = 0.25
+RPART_RATE = 0.25
+CPART_RATE = 0.20
+# e.g. aug_text(u'', 0.5, {'change_char': 0.2, 'reorder_char': 0.2, 'reorder_word': 0.2, 'repeat_part': 0.2, 'clip_part': 0.2})
+def aug_text(text, prob, types_and_probs):
+    '''
+    probs: to control the total probability of augment.
+    types_and_probs: a dict to specify the specific type probability.
+    e.g.: {'change_char': 0.2, 'reorder_char': 0.2, 'reorder_word': 0.2, 'repeat_part': 0.2, 'clip_part': 0.2}
+    '''
+    if (prob == 0.0):
+        return text
+    if (len(text) < 3):
+        return text
+    if (prob > 1.0):
+        raise ValueError(error('PROB SHOULD LESS THAN 1.0 .', time_tag=True, only_get=True))
+    if (None == types_and_probs or len(types_and_probs) == 0):
+        raise ValueError(error('types_and_probs SHOULD NOT BE NONE.', time_tag=True, only_get=True))
+    tp_keys, tp_values = types_and_probs.keys(), types_and_probs.values()
+    if (np.sum(tp_values) != 1.0):
+        raise ValueError(error('THE SUM OF types_and_probs NOT EQUALS 1.0 .', time_tag=True, only_get=True))
+    tp_values = fabn(tp_values)
+    # total prob
+    nt_arr = []
+    if (np.random.randint(1, 101) < 100 * prob):
+        type_prob = np.random.randint(1, 101) / 100.
+        atype = tp_keys[get_section(type_prob, tp_values)]
+        # rainbow(atype)
+        text = text.strip()
+        text = list(text)
+        tlen = len(text)
+        if (atype == 'change_char'):
+            vcount = int(tlen * CCHAR_RATE)
+            if (vcount > 0):
+                vids = np.random.randint(0, tlen, [vcount])
+                vnew_chars = np.random.randint(CHAR_CODE_BEGIN, CHAR_CODE_END, [vcount])
+                for i in range(vcount):
+                    text[vids[i]] = unichr(vnew_chars[i])
+        elif (atype == 'reorder_char'):
+            vcount = int(tlen * RCHAR_RATE)
+            if (vcount > 0):
+                vids = np.random.randint(0, tlen, [vcount])
+                for i in range(vcount):
+                    exid = np.random.randint(0, tlen)
+                    tmp = text[exid]
+                    text[exid] = text[vids[i]]
+                    text[vids[i]] = tmp
+        elif (atype == 'reorder_word'):
+            text = ''.join(text)
+            if (None == jieba):
+                return text
+            word_ite = jieba.cut(text)
+            wa = []
+            for e in word_ite:
+                wa.append(e)
+            tlen = len(wa)
+            vcount = int(tlen * RWORD_RATE)
+            if (vcount > 0):
+                vids = np.random.randint(0, tlen, [vcount])
+                for i in range(vcount):
+                    exid = np.random.randint(0, tlen)
+                    tmp = wa[exid]
+                    wa[exid] = wa[vids[i]]
+                    wa[vids[i]] = tmp
+            text = list(''.join(wa))
+        elif (atype == 'repeat_part'):
+            if (tlen > 3 * 2):
+                slice = np.random.randint(1, tlen-1, [2])
+                slice.sort()
+                start, end = slice[0], slice[1]
+                if (end > start):
+                    insertp = end
+                    text = text[:start] + text[start:end] * 2 + text[end:]
+        elif (atype == 'clip_part'):
+            if (tlen > 3 * 2):
+                vcount = int(tlen * CPART_RATE)
+                if (vcount > 0):
+                    text = text[vcount:] if (np.random.randint(1, 3) == 1) else text[:tlen - vcount]
+        return ''.join(text)
+    return text
+                
+        
+    
 
 def split_list(arr):
     if (len(arr) < 1):
@@ -535,15 +651,17 @@ def __get_batch__(source, label, batch_size=8, index=0):
 # Following function is for real task reading.
 # Guys you can define your own function by contributing this project.
 
-def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, unk_id=0, sos_id=1, eos_id=2, dtype=np.int32,\
-                      rmask=False, rmask_prob=0.15, rmask_uc=0.2):
+def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, unk_id=0, sos_id=1, eos_id=2, dtype=np.int32, augment=0.0, aug_types=None):
     sbatch, lbatch, need_shuffle, index = __get_batch__(source, label, batch_size, index)
     enc_in_data = []
     dec_in_data = []
     dec_out_data = []
     enc_in_len = []
     dec_out_len = []
+    if (None == aug_types and augment > 0.0):
+        aug_types = {'change_char': 0.2, 'reorder_char': 0.2, 'reorder_word': 0.2, 'repeat_part': 0.2, 'clip_part': 0.2}
     for sen in sbatch:
+        sen = aug_text(sen, augment, aug_types)
         _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, sos=True, sos_id=sos_id)
         enc_in_data.append(_1)
         enc_in_len.append(_2)
@@ -553,17 +671,6 @@ def get_seq2seq_batch(source=[], label=[], batch_size=8, index=0, vocab=None, un
         _1, _2 = convert_str_to_ids(sen, vocab, unk_id=unk_id, eos=True, eos_id=eos_id)
         dec_out_data.append(_1)
         dec_out_len.append(_2)
-    if (rmask):
-        p = np.random.randint(1, 101)
-        if (p <= 100 * int(rmask_prob)):
-            # minus the SOS tag
-            eid_len = len(enc_in_data) - 1
-            eid_len_mask = int(eid_len * rmask_uc)
-            if (int(eid_len_mask) > 0):
-                _rid_ = np.random.randint(4, len(vocab), [eid_len_mask])
-                _rid_idx_ = np.random.randint(1, eid_len + 1, [eid_len_mask])
-                for i in range(eid_len_mask):
-                    enc_in_data[_rid_idx_[i]] = _rid_[i]
     enc_in_data = padding_array(enc_in_data, dtype=dtype)
     dec_in_data = padding_array(dec_in_data, dtype=dtype)
     dec_out_data = padding_array(dec_out_data, dtype=dtype)
@@ -606,7 +713,7 @@ def writef(fname='', value='', mode='a', fcode='utf-8'):
         wf.flush()
 
 records = {}
-def record(key='', value=np.inf, limit=1000):
+def record(key='', value=np.inf, limit=1000, force_write=False):
     global records
     if (key == '' or value == np.inf):
         raise ValueError(error('INVALID KEY OR VALUE IN RECORD.', time_tag=True, only_get=True))
@@ -614,7 +721,7 @@ def record(key='', value=np.inf, limit=1000):
         records[key] = []
     else:
         records[key].append(value)
-    if (len(records[key]) == limit):
+    if (len(records[key]) == limit or force_write):
         mean = np.mean(records[key])
         writef(key, valid_str(mean))
         records[key] = []
