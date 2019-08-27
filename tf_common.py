@@ -2,8 +2,15 @@
 import tensorflow as tf
 import os
 import numpy as np
+import math
 
 import gdu as g
+
+INT32 = tf.int32
+INT = INT32
+FLOAT32 = tf.float32
+FLOAT = FLOAT32
+BOOL = tf.bool
 
 tanh = tf.nn.tanh
 relu = tf.nn.relu
@@ -16,6 +23,8 @@ rnormal = tf.random_normal
 runiform = tf.random_uniform
 layer = tf.layers
 l2_loss = tf.nn.l2_loss
+ones = tf.ones
+zeros = tf.zeros
 
 # _sentinel=None, labels=None, logits=None, name=None
 sce = tf.nn.sparse_softmax_cross_entropy_with_logits
@@ -26,68 +35,92 @@ se = tf.nn.sigmoid_cross_entropy_with_logits
 # labels, predictions, weights=1.0, scope=None, loss_collection='losses'
 mse = tf.losses.mean_squared_error
 
-__all__ = ['tanh', 'relu', 'relu6', 'sigmoid', 'softsign', 'softplus', 'swish', 'rnormal', 'runiform',\
-           'layer', 'ce', 'se', 'mse', 'l2n', 'softmax', 'lrelu', 'get_init', 'random_embeddings',\
-           'gru', 'uni_gru', 'bi_gru', 'conv2d', 'sepconv2d', 'maxpool2d', 'avgpool2d', 'dense', 'dropout',\
-           'moments', 'gclip', 'load_model', 'selfatt', 'emb_lookup', 'l2_reg', 'luong_att', 'luong_att']
+__anno__ = \
+'''
+ANNOTATION:
+name => scope name.
+resc/res => residual num.
+ac => activation function.
+x => input tensor.
+mode => train or infer mode.
+'''
 
-__all_anno__ = ['function tanh from tensorflow without modification.',\
-                'function relu from tensorflow without modification.',\
-                'function relu6 from tensorflow without modification.',\
-                'function sigmoid from tensorflow without modification.',\
-                'function softsign from tensorflow without modification.',\
-                'function softplus from tensorflow without modification.',\
-                'function swish from tensorflow without modification.',\
-                'create random normal distribution tensor by tensorflow.',\
-                'create random uniform distribution tensor by tensorflow.',\
-                'reference from tensorflow.layers.',\
-                'reference from tensorfllow.nn.softmax_cross_entropy_with_logits_v2',\
-                'reference from tf.nn.sigmoid_cross_entropy_with_logits',\
-                'reference from tf.losses.mean_squared_error',\
-                'l2 normalize by axis.',\
-                'function softmax from tensorflow without modification.',\
-                'function lrelu from tensorflow without modification.',\
-                'get initializer by glorot uniform or normal.',\
-                'create random embeddings with defualt scop name "embeddings".',\
-                'create a gru cell.',\
-                'create a uni direction gru cell list.',\
-                'create a bi direction gru cell list.',\
-                'simple ref for conv2d from tensorflow.',\
-                'simple ref for seperable conv2d from tensorflow.',\
-                'simple ref for max pooling by 2d from tensorflow.',\
-                'simple ref for average pooling by 2d from tensorflow.',\
-                'create a dense connection.',\
-                'create a dropout operation.',\
-                'to calc the means and variances for tensor.',\
-                'clip the gradients by specific norm value.',\
-                'to chech whether need to load existed ckpt file.',\
-                'a simple self-attention impl.',\
-                'simple ref for tf.nn.embedding_lookup.',\
-                'simple ref for tf.nn.l2_loss.',\
-                'luong and sluong attention mechanism builder.',\
-                'bahdanau and normed bahdanau attention mechanism builder.']
+__all__ = [('BOOL', 'type of tensorflow.bool'),\
+           ('FLOAT', 'type of tensorflow.float32'),\
+           ('INT', 'type of tensorflow.int32'),\
+           ('avgpool2d', 'average pool for 2d tensor, params => (pool_size, strides, padding, format, name)'),\
+           ('bahdanau_att', 'create a bahdanau attention with wrapper, params => (cell, units, memory, seq_len, normed, align_history, name)'),\
+           ('bi_gru', 'create a bi-direction GRU cell list, params => (num_units, num_layers, ac, dropout, mode, resc)'),\
+           ('ce', 'a ref of tensorflow.nn.softmax_cross_entropy_with_logits_v2, params => (_sentinel, labels, logits, dim, name)'),\
+           ('conv2d', 'conv for 2d tensor, params => (filters, ksize, strides, padding, data_format, dilation_rate, ac, use_bias, name)'),\
+           ('dense', 'dense layer from tensorflow, params => (units, ac, use_bias, name), {LAYER}'),\
+           ('dropout', 'dropout layer from tensorflow, params => (rate, name), {LAYER}'),\
+           ('dselfatt', 'self attention for dynamic length of seq2seq, params => (x, att_size, dropout_rate, res, mode)'),\
+           ('emb_lookup', 'lookup the responsive emb tensor, params => (emb, source)'),\
+           ('flat', 'flat a muilti-rank(<=2) iterable item to a python list, params => (x, name, convert_to_tensor)'),\
+           ('gclip', 'clip the gradients, params => (gradients, maxn=2.0)'),\
+           ('gelu', 'activation function from BERT, params => (x)'),\
+           ('get_init', 'get tensorflow initializer, params => (type)'),\
+           ('get_scope', 'get tensorflow variables by specific scope, params => (scope)'),\
+           ('gru', 'GRU cell from tensorflow, params => (num_units, ac, dropout, mode, res)'),\
+           ('l2_loss', 'l2 loss from tensorflow.nn.l2_loss, params => (x)'),\
+           ('l2_reg', 'get l2 regularization by scope, params => (rate, scope)'),\
+           ('l2n', 'l2 normalize, params => (x, axis)'),\
+           ('layer', 'a ref from tensorflow.layer'),\
+           ('load_model', 'load the existed model or return original model class, params => (model, model_dir, session)'),\
+           ('lrelu', 'leaky relu activation function, params => (x, leak)'),\
+           ('luong_att', 'create luong attention, params => (cell, units, memory, seq_len, scaled, align_history, name)'),\
+           ('math', 'math module of python'),\
+           ('maxpool2d', 'max pool for tensor, params => (pool_size, strides, padding, format, name)'),\
+           ('moments', 'a ref from tensorflow.nn.moments, params => (x, axes, keep_dims)'),\
+           ('mse', 'a ref from tf.losses.mean_squared_error, params => (labels, predictions, weights, scope, loss_collection)'),\
+           ('ngelu', 'gelu activation function with normed, params => (x)'),\
+           ('norm', 'a ref from tf.contrib.layers.layer_norm, params => (x, axis)'),\
+           ('np', 'numpy module'),\
+           ('ones', 'a ref from tensorflow.ones'),\
+           ('random_embeddings', 'get an random embeddings table, params => (vocab_size, embedding_size, scope_name, dtype)'),\
+           ('relu', 'a ref from tensorflow.nn.relu'),\
+           ('relu6', 'a ref from tensorflow.nn.relu6'),\
+           ('rnormal', 'a ref from tensorflow.random_normal, params => (shape, mean, var)'),\
+           ('runiform', 'a ref from tensorflow.random_uniform, params => (shape, mean, var)'),\
+           ('sce', 'a ref from tf.nn.sparse_softmax_cross_entropy_with_logits, params => (_sentinel, labels, logits, name)'),\
+           ('se', 'a ref from tf.nn.sigmoid_cross_entropy_with_logits, params => (_sentinel, labels, logits, name)'),\
+           ('sepconv2d', 'seperable conv for 2d tensor, params => (filters, ksize, strides, padding, data_format, dilation_rate, multiplier, ac, use_bias, name)'),\
+           ('sigmoid', 'a ref from tensorflow.nn.sigmoid'),\
+           ('softmax', 'a ref from tensorflow.nn.softmax'),\
+           ('softplus', 'a ref from tensorflow.nn.softplus'),\
+           ('softsign', 'a ref from tensorflow.nn.softsign'),\
+           ('sself_att', 'self attention for static seq length which liked BERT(the imp of dropout has some difference with origianl paper).'),\
+           ('swish', 'a ref from tensorflow.nn.swish'),\
+           ('tanh', 'a ref from tensorflow.nn.tanh'),\
+           ('tf', 'a ref from tensorflow'),\
+           ('transformer_block', 'a implemented Transformer Block with static self attention, params => (x, layers, num_heads, num_per_heads, ac, dropout_rate, mode)'),\
+           ('uni_gru', 'create an uni-direction GRU cell list, params => (num_units, num_layers, ac, dropout, mode, resc)'),\
+           ('zeros', 'a ref from tensorflow.zeros')]
 
 def flist():
     '''
     List all functions and annotations within this module.
     '''
-    global __all__, __all_anno__
-    for f in zip(__all__, __all_anno__):
-        g.normal(f)
-
-def gelu(x):
-    cdf = 0.5 * (1.0 + tf.tanh((np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
-    return x * cdf
-
-def ngelu(x):
-    x = gelu(x)
-    return tf.contrib.layers.layer_norm(inputs=x, begin_norm_axis=-1, begin_params_axis=-1)
+    global __anno__, __all__
+    g.infor(__anno__)
+    for k, v in __all__:
+        g.normal(k)
+        g.normal('ANO => ' + v + '\n')
 
 def l2n(x, axis=-1):
     return tf.nn.l2_normalize(x, axis=axis)
 
 def norm(x, axis=-1):
     return tf.contrib.layers.layer_norm(inputs=x, begin_norm_axis=-1, begin_params_axis=-1)
+
+def gelu(x):
+    cdf = 0.5 * (1.0 + tf.tanh((np.sqrt(2 / np.pi) * (x + 0.044715 * tf.pow(x, 3)))))
+    return x * cdf
+
+def ngelu(x):
+    x = norm(gelu(x))
+    return x
 
 def softmax(x, axis=-1):
     return tf.nn.softmax(x, axis=axis)
@@ -160,10 +193,10 @@ def moments(x, axes=-1, keep_dims=False):
 def emb_lookup(emb, source):
     return tf.nn.embedding_lookup(emb, source)
 
-def selfatt(x, att_size, dropout_rate=0.0, res=True, mode='train'):
+def dselfatt(x, att_size, dropout_rate=0.0, res=True, mode='train'):
     if (mode != 'train'):
         dropout_rate = 0.0
-    g.infor('SELFATT DROPOUT:%.2f' % dropout_rate)
+    g.infor('S-SELFATT DROPOUT:%.2f' % dropout_rate)
     xshape = tf.shape(x)
     q = dense(att_size)(x)
     k = dense(att_size)(x)
@@ -176,6 +209,61 @@ def selfatt(x, att_size, dropout_rate=0.0, res=True, mode='train'):
         return result + x
     else:
         return result
+
+def sself_att(x, num_heads, num_per_heads, ac=None, dropout_rate=0.0, mode='train'):
+    '''
+        x-shape: batch_size, seq_length, hidden_size/emb_size;
+    '''
+    if (mode != 'train'):
+        dropout_rate = 0.0
+    g.infor('D-SELFATT DROPOUT:%.2f' % dropout_rate)
+    xshape = tf.shape(x)
+    x = tf.reshape(x, [-1, xshape[-1]])
+    que = dense(num_heads * num_per_heads, ac=ac)(x)
+    key = dense(num_heads * num_per_heads, ac=ac)(x)
+    val = dense(num_heads * num_per_heads, ac=ac)(x)
+    que = tf.reshape(que, [xshape[0], num_heads, xshape[1], num_per_heads])
+    key = tf.reshape(key, [xshape[0], num_heads, xshape[1], num_per_heads])
+    score = tf.multiply(tf.matmul(que, key, transpose_b=True), 1.0 / math.sqrt(float(num_per_heads)))
+    score = softmax(score)
+    val = tf.reshape(val, [xshape[0], xshape[1], num_heads, num_per_heads])
+    val = tf.transpose(val, [0, 2, 1, 3])
+    context = tf.transpose(tf.matmul(score, val), [0, 2, 1, 3])
+    context = tf.reshape(context, [xshape[0], xshape[1], -1])
+    if (dropout_rate > 0.0):
+        context = dropout(dropout_rate)(context)
+    return context
+
+def transformer_block(x, layers, num_heads, num_per_heads, ac=gelu, dropout_rate=0.0, mode='train'):
+    '''
+        Transformer Block, x must with a explicit seq_length and hidden_size/emb_size;
+        x.shape = [batch_size, static_seq_length, hidden_size/emb_size];
+    '''
+    if (mode != 'train'):
+        dropout_rate = 0.0
+    g.infor('TRANSFORMER BLOCK DROPOUT:%.2f' % dropout_rate)
+    all_layers_outputs = []
+    xshape = x.shape
+    layer_input = x
+    for layer_idx in range(layers):
+        with tf.variable_scope('layer_%d' % layer_idx):
+            with tf.variable_scope("attention"):
+                with tf.variable_scope("self"):
+                    cxt = sself_att(layer_input, num_heads, num_per_heads, None, dropout_rate, mode)
+                with tf.variable_scope("output"):
+                    # linear projection
+                    cxt = dense(xshape[-1].value, ac, use_bias=False)(cxt)
+                    cxt = dropout(dropout_rate)(cxt)
+                    cxt = norm(cxt + layer_input)
+            with tf.variable_scope('intermediate'):
+                itm = dense(xshape[-1].value * 4, ac)(cxt)
+            with tf.variable_scope("output"):
+                fout = dense(xshape[-1].value, None)(itm)
+                fout = dropout(dropout_rate)(fout)
+                fout = norm(fout + cxt)
+                layer_input = fout
+                all_layers_outputs.append(fout)
+    return all_layers_outputs
 
 def l2_reg(rate=0.0005, scope=''):
     if (scope == ''):
@@ -192,11 +280,16 @@ def bahdanau_att(cell, units, memory, seq_len, normed=False, align_history=False
     att = tf.contrib.seq2seq.BahdanauAttention(units, memory, memory_sequence_length=seq_len, normalize=normed)
     return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
 
-def gclip(gradients, maxn=1.0):
+def gclip(gradients, maxn=2.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
     return clipped_gradients, gradient_norm
 
 def load_model(model, model_dir, session):
+    '''
+    model => model class
+    mode_dir => model dir string path
+    session => tensorflow.Session
+    '''
     latest_ckpt = tf.train.latest_checkpoint(model_dir)
     gi = tf.global_variables_initializer()
     if latest_ckpt:
@@ -208,9 +301,10 @@ def load_model(model, model_dir, session):
     global_step = model.global_step.eval(session=session)
     return model, global_step
 
-def flat(x, name='flat'):
+def flat(x, name='flat', convert_to_tensor=False):
     '''
     Flat up to 2 layers of iterable elements.
+    e.g.: [(a,b), (c,d)] => [a,b,c,d].
     '''
     r = []
     tx = type(x)
@@ -221,7 +315,12 @@ def flat(x, name='flat'):
                 r.append(e2)
         else:
             r.append(e1)
+    if (not convert_to_tensor):
+        return r
     return tf.identity(r, name)
 
 def get_scope(scope=''):
+    '''
+    get variables from scope in {tf.GraphKeys.TRAINABLE_VARIABLES}.
+    '''
     return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)

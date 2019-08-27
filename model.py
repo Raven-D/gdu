@@ -40,9 +40,9 @@ class Cls(object):
         self.enc_emb_input = tc.l2n(self.enc_emb_input)
         # do self attention for some iter
         with scope('wordrepr') as sc:
-            satt = tc.selfatt(self.enc_emb_input, self.emb_size, mode=self.mode)
+            satt = tc.dselfatt(self.enc_emb_input, self.emb_size, mode=self.mode)
             satt = tc.l2n(satt)
-            satt = tc.selfatt(satt, self.emb_size, mode=self.mode)
+            satt = tc.dselfatt(satt, self.emb_size, mode=self.mode)
             satt = tc.l2n(satt)
             g.rainbow('satt')
             g.rainbow(satt)

@@ -67,14 +67,15 @@ def valid_str(info):
     try:
         info = str(info)
     except UnicodeEncodeError:
-        info = info.encode('utf-8')
+        # info = info.encode('utf-8')
+        return info
     return info
 
 def normal(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['fg_white'] + COLORS['bg_black'] + u'\u25e5 ' + info + COLOR_END
+    info = COLORS['fg_white'] + u'\u25e5 ' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -83,7 +84,7 @@ def infor(info, time_tag=False, only_get=False):
     info = valid_str(info)
     if (time_tag):
         info = create_time_tag() + info
-    info = COLORS['fg_white'] + COLORS['bg_blue'] + u'\u272a ' + info + COLOR_END
+    info = COLORS['fg_white'] + COLORS['bg_blue'] + u'\u263b ' + info + COLOR_END
     if (only_get):
         return info
     print(info)
@@ -333,7 +334,7 @@ CCHAR_RATE = 0.25
 RCHAR_RATE = 0.25
 RWORD_RATE = 0.25
 RPART_RATE = 0.25
-CPART_RATE = 0.20
+CPART_RATE = 0.50
 # e.g. aug_text(u'', 0.5, {'change_char': 0.2, 'reorder_char': 0.2, 'reorder_word': 0.2, 'repeat_part': 0.2, 'clip_part': 0.2})
 def aug_text(text, prob, types_and_probs):
     '''
@@ -439,8 +440,7 @@ def unzip_tuple(tarr):
         try:
             k,v = titem
         except ValueError:
-            error('UNZIP ERROR, ' + str(titem))
-            sys.exit(0)
+            raise ValueError(error('UNZIP ERROR, ' + str(titem), time_tag=True, only_get=True))
         keys.append(k)
         values.append(v)
     return keys, values
