@@ -49,7 +49,6 @@ __all__ = [('BOOL', 'type of tensorflow.bool'),\
            ('FLOAT', 'type of tensorflow.float32'),\
            ('INT', 'type of tensorflow.int32'),\
            ('avgpool2d', 'average pool for 2d tensor, params => (pool_size, strides, padding, format, name)'),\
-           ('bahdanau_att', 'create a bahdanau attention with wrapper, params => (cell, units, memory, seq_len, normed, align_history, name)'),\
            ('bi_gru', 'create a bi-direction GRU cell list, params => (num_units, num_layers, ac, dropout, mode, resc)'),\
            ('ce', 'a ref of tensorflow.nn.softmax_cross_entropy_with_logits_v2, params => (_sentinel, labels, logits, dim, name)'),\
            ('conv2d', 'conv for 2d tensor, params => (filters, ksize, strides, padding, data_format, dilation_rate, ac, use_bias, name)'),\
@@ -57,7 +56,7 @@ __all__ = [('BOOL', 'type of tensorflow.bool'),\
            ('dropout', 'dropout layer from tensorflow, params => (rate, name), {LAYER}'),\
            ('dselfatt', 'self attention for dynamic length of seq2seq, params => (x, att_size, dropout_rate, res, mode)'),\
            ('emb_lookup', 'lookup the responsive emb tensor, params => (emb, source)'),\
-           ('flat', 'flat a muilti-rank(<=2) iterable item to a python list, params => (x, name, convert_to_tensor)'),\
+           ('flat_bi_states', 'flat the bi-direction rnn states, params => (states, return_tuple, concat_fb)'),\
            ('gclip', 'clip the gradients, params => (gradients, maxn=2.0)'),\
            ('gelu', 'activation function from BERT, params => (x)'),\
            ('get_init', 'get tensorflow initializer, params => (type)'),\
@@ -69,7 +68,6 @@ __all__ = [('BOOL', 'type of tensorflow.bool'),\
            ('layer', 'a ref from tensorflow.layer'),\
            ('load_model', 'load the existed model or return original model class, params => (model, model_dir, session)'),\
            ('lrelu', 'leaky relu activation function, params => (x, leak)'),\
-           ('luong_att', 'create luong attention, params => (cell, units, memory, seq_len, scaled, align_history, name)'),\
            ('math', 'math module of python'),\
            ('maxpool2d', 'max pool for tensor, params => (pool_size, strides, padding, format, name)'),\
            ('moments', 'a ref from tensorflow.nn.moments, params => (x, axes, keep_dims)'),\
@@ -96,7 +94,10 @@ __all__ = [('BOOL', 'type of tensorflow.bool'),\
            ('tf', 'a ref from tensorflow'),\
            ('transformer_block', 'a implemented Transformer Block with static self attention, params => (x, layers, num_heads, num_per_heads, ac, dropout_rate, mode)'),\
            ('uni_gru', 'create an uni-direction GRU cell list, params => (num_units, num_layers, ac, dropout, mode, resc)'),\
-           ('zeros', 'a ref from tensorflow.zeros')]
+           ('zeros', 'a ref from tensorflow.zeros'),\
+           ('create_attention_mechanism', 'create attention mechnism class for luogn and bahdanau...'),\
+           ('dbigru_encoder', 'create a standard seq2seq GRU encoder.'),\
+           ('dgru_decoder', 'create a standard seq2seq GRU decoder with or without attention mechnism.')]
 
 def flist():
     '''
@@ -265,20 +266,84 @@ def transformer_block(x, layers, num_heads, num_per_heads, ac=gelu, dropout_rate
                 all_layers_outputs.append(fout)
     return all_layers_outputs
 
+def create_attention_mechanism(attention_mode='bahdanau', num_units=None, memory=None, source_sequence_length=None):
+    attention_mechanism = None
+    if (attention_mode == 'luong'):
+        attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+            num_units, memory, memory_sequence_length=source_sequence_length)
+    elif (attention_mode == 'sluong'):
+        attention_mechanism = tf.contrib.seq2seq.LuongAttention(
+            num_units, memory, memory_sequence_length=source_sequence_length, scale=True)
+    elif (attention_mode == 'bahdanau'):
+        attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+            num_units, memory, memory_sequence_length=source_sequence_length)
+    elif (attention_mode == 'nbahdanau'):
+        attention_mechanism = tf.contrib.seq2seq.BahdanauAttention(
+            num_units, memory, memory_sequence_length=source_sequence_length, normalize=True)
+    else:
+        raise ValueError(g.error('INVALID ATTENTION MODE', time_tag=True, only_get=True))
+    return attention_mechanism
+
+def dbigru_encoder(hidden_size, layers, emb_input_source, input_source_len, ac=tanh,\
+                   dropout_rate=0.0, mode='train', resc=0, concat_out=True, scope='BiGRU_Encoder'):
+    with tf.variable_scope(scope) as sc:
+        fwl, bwl = bi_gru(hidden_size, layers, ac=ac, dropout=dropout_rate, mode=mode, resc=resc)
+        bi_out, bi_state = tf.nn.bidirectional_dynamic_rnn(fwl, bwl, emb_input_source, dtype=tf.float32, sequence_length=input_source_len)
+    if (concat_out):
+        bi_out = tf.concat(bi_out, axis=-1)
+    return bi_out, bi_state
+
+def dgru_decoder(hidden_size, layers, encoder_outputs, encoder_states, force_teach, emb_table,\
+                 label, label_length, input_len, target_vocab_size, ac=tanh, dropout_rate=0.0, att_type='',\
+                 mode='train', resc=0, use_states=False, max_ite=0, max_ite_rate=5.0,\
+                 sos_id=1, eos_id=2, scope='UniGRU_decoder'):
+    '''
+    Create a standard seq2seq decoder by force teaching.
+    '''
+    with tf.variable_scope(scope) as sc:
+        if (max_ite == 0):
+            max_ite = tf.to_int32(tf.round(tf.to_float(tf.reduce_max(input_len)) * max_ite_rate))
+        decoder_cell = uni_gru(hidden_size, layers, ac, dropout_rate, mode, resc)
+        batch_size = tf.size(label_length)
+
+        logits, sample_id, final_context = None, None, None
+        project = dense(target_vocab_size, ac=None, use_bias=False)
+
+        if (att_type != ''):
+            attm = create_attention_mechanism(attention_mode=att_type, num_units=hidden_size, memory=encoder_outputs, source_sequence_length=input_len)
+            alignment_history = True if mode != 'train' else False
+            decoder_cell = tf.contrib.seq2seq.AttentionWrapper(decoder_cell, attm, attention_layer_size=hidden_size, alignment_history=alignment_history, name='attention')
+
+        decoder_init_states = None
+        if (use_states):
+            decoder_init_states = encoder_states
+        if (att_type != ''):
+            decoder_init_states = decoder_cell.zero_state(batch_size, FLOAT)
+
+        print 'decoder_init_states', decoder_init_states
+
+        if (mode == 'train'):
+            helper = tf.contrib.seq2seq.TrainingHelper(emb_lookup(emb_table, force_teach), label_length)
+            fdecoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, helper, decoder_init_states)
+            outputs, final_context, _ = tf.contrib.seq2seq.dynamic_decode(fdecoder, swap_memory=True, scope=sc)
+            logits = project(outputs.rnn_output)
+            sample_id = tf.argmax(logits, axis=-1)
+        else:
+            start_tokens = tf.fill([batch_size], sos_id)
+            end_token = eos_id
+            helper = tf.contrib.seq2seq.GreedyEmbeddingHelper(emb_table, start_tokens, end_token)
+            decoder = tf.contrib.seq2seq.BasicDecoder(decoder_cell, helper, decoder_init_states, output_layer=project)
+            outputs, final_context, _ = tf.contrib.seq2seq.dynamic_decode(decoder, maximum_iterations=maximum_iterations, swap_memory=True, scope=sc_d)
+            logits = outputs.rnn_output
+            sample_id = outputs.sample_id
+        return logits, sample_id, final_context
+
 def l2_reg(rate=0.0005, scope=''):
     if (scope == ''):
         params = tf.trainable_variables()
     else:
         params = get_scope(scope)
     return tf.reduce_sum([l2_loss(v) for v in params]) * rate
-
-def luong_att(cell, units, memory, seq_len, scaled=False, align_history=False, name='luong_attention'):
-    att = tf.contrib.seq2seq.LuongAttention(units, memory, memory_sequence_length=seq_len, scale=scaled)
-    return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
-
-def bahdanau_att(cell, units, memory, seq_len, normed=False, align_history=False, name='bahdanau_attention'):
-    att = tf.contrib.seq2seq.BahdanauAttention(units, memory, memory_sequence_length=seq_len, normalize=normed)
-    return tf.contrib.seq2seq.AttentionWrapper(cell, att, attention_layer_size=units, alignment_history=align_history, name=name)
 
 def gclip(gradients, maxn=2.0):
     clipped_gradients, gradient_norm = tf.clip_by_global_norm(gradients, maxn)
@@ -301,26 +366,50 @@ def load_model(model, model_dir, session):
     global_step = model.global_step.eval(session=session)
     return model, global_step
 
-def flat(x, name='flat', convert_to_tensor=False):
+def flat_bi_states(states, return_tuple=True, concat_fb=False):
     '''
-    Flat up to 2 layers of iterable elements.
-    e.g.: [(a,b), (c,d)] => [a,b,c,d].
+    Flat the RNN states.
+    e.g.: ((fw1, fw2), (bw1, bw2))
+            concat_fb == False, => (fw1, bw1, fw2, bw2)
+            concat_fb == True, => (fw1-bw1, fw2-bw2)
+        return_tuple: [] or ()
     '''
-    r = []
-    tx = type(x)
-    for e1 in x:
-        tex = type(e1)
-        if (tex == list or tex == tuple):
-            for e2 in e1:
-                r.append(e2)
+    states_len = len(states)
+    if (states_len == 2):
+        rstates = []
+        if (type(states[0]) != tuple):
+            if (not concat_fb):
+                rstates.append(states[0])
+                rstates.append(states[1])
+            else:
+                rstates.append(tf.concat((states[0], states[1]), axis=-1))
+            if (return_tuple):
+                return tuple(rstates)
+            else:
+                return states
         else:
-            r.append(e1)
-    if (not convert_to_tensor):
-        return r
-    return tf.identity(r, name)
+            # new states = [fw1, bw1, fw2, bw2 ...]
+            layers = len(states[0])
+            for i in range(layers):
+                if (not concat_fb):
+                    rstates.append(states[0][i])
+                    rstates.append(states[1][i])
+                else:
+                    rstates.append(tf.concat((states[0][i], states[1][i]), axis=-1))
+            if (return_tuple):
+                return tuple(rstates)
+            else:
+                return rstates
 
 def get_scope(scope=''):
     '''
     get variables from scope in {tf.GraphKeys.TRAINABLE_VARIABLES}.
     '''
     return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scope)
+
+def show_variables():
+    params = tf.trainable_variables()
+    g.normal('\\' * 25)
+    for p in params:
+        g.normal(p)
+    g.normal('/' * 25)
