@@ -1,132 +1,90 @@
-# GDU Instruction
+# GDU & TF_COMMON Instructions
+* **gdu.py is a convenient functions tool for data processing.**
+* **tf_common.py is a high level and convenient wrapper for TensorFlow APIs, include some preveiling blocks.**
 
-### GDU what we create is plan to be used for handle huge data size, esp for sequence data.
-### For huge data size, we emulate a multinomial distribution to fetch all kinds of data, by using this emulation we would get an approximate global shuffling process.
-### So if the current emulation method is not good for task, you could make a better sulotion by yourself own to improve this module.
+----
 
-#### Here's some API instruction as following:
+For using **GDU** module, you should follow these steps:
 
-## PREPARATION
-
-##### We recommand that you should attach the 'source' data and 'labels' data together.
-##### For doing this, you could use linux command 'paste'.
-##### If you hold 2 files, one is full of "input sentence" and another is full of "reply sentence".
-##### You need to combine the 2 files into 1 file with a sign '=', ofcourse you can choose another split sign and be care that it would be better what your text data does not contain the split sign.
-
+data format:
 ```
-paste -d = input.data replay.data > chat.data
-```
-###### By then, you data will looks like this:
-
-```
-很好行认识你=我也是
-say hello=hello!
-Chao!=Chao bella!
-...
-...
+> sequence_source=sequence_label
+> e.g.
+>   for CHAT, 你好=你也好啊！
+>   for CLS, 新华社消息……=2 # (2 is the id of news domain)
+>   for TAG, 中华人民站起来了=BEBEBIEE
 ```
 
-### Specifically, we show some exmaple data as following:
-
-**TASK CLASSIFICATION**
-
-
-```
-# positive data type id = 0
-# negative data type id = 1
-
-你好很高兴见到你=0
-我不怎么喜欢你=1
-Glad to see u guys!=0
-What the hell did you do?!=1
-...
-...
-```
-
-**TASK CHIT-CHAT**
-
-
-```
-你好啊=你也好！
-我很好=我还行！
-Good to see you=me, too
-Farewell=Dont say that!
-...
-...
-```
-
-**TASK SEQUENCE TAGGING**
-
-###### Because the standard sequence tagging sign is not a single char, we recommand that you would better translate your own tag sign to a single char.
-###### e.g.: PLACE_B => a, PLACE_E => b, NAME_B => c, ...
-
-```
-请观看今天的人民日报=bababbaaab
-下午3点去吃饭=ababbab
-...
-...
-```
-
-## HOW TO USE
-
-
+For import module:
 ```
 import gdu as g
+```
 
-# init your vocab
-vocab = read_vocab('./data/vocab.data')
-# make your reverse vocab to convert ids to chars
-rvocab = reverse_vocab(vocab)
+For reading vocab:
+```
+vocab = g.read_vocab(VOCAB_PATH)
+reverse_vocab = g.reverse_vacab(vocab)
+```
 
-# for huge data size
-# here cache is the file lines for file pieces
-newd = g.tear_to_pieces({'application':['./data/appfinal.txt'], 'tvchannel':['./data/channelfinal.txt'], 'personchat':['./data/chatfinal.txt'], 'converter':['./data/converterfinal.txt'], 'couplets':['./data/coupletfinal.txt'], 'disport':['./data/disportfinal.txt']}, cache=2048)
-# define your own TRAIN_STEP
+If your data can be fully loaded in RAM, you could load data as the following:
+```
+source_label = g.read_contents(FILE_PATH, replace=' ', split='=')
+source, label = g.unzip_tuple(source_label)
+index = 0
 for i in range(TRAIN_STEP):
-    # here cache is how many datas you want to read from all files, we recommend you choose a big integer but less that file piece.
+    eid, eil, did, dod, dol, need_shuffle, index = g.get_seq2seq_batch(source, label, 256, index, vocab)
+    if (need_shuffle):
+        source, label = g.unzip_tuple(g.shuffle(source_label))
+```
+
+If your data is too huge and can not be fully loaded into RAM, you can use **{multinomial_read}** to simulate a global shuffle.
+```
+newd = g.tear_to_pieces({'class1':['./data/class1.txt'],\
+                         'class2':['./data/class2.txt'],\
+                         'class3':['./data/class3.txt'],\
+                         'class4':['./data/class4.txt'],\ 
+                         'class5':['./data/class5.txt'],\ 
+                         'class6':['./data/class6.txt']},\
+                         cache=204800)
+for i in range(TRAIN_STEP):
     source_label = multinomial_read(newd, cache=1024, replace=' ', split='=')
     source, label = unzip_tuple(source_label)
     index = 0
     need_shuffle = False
     while (need_shuffle == False):
         eid, eil, ld, need_shuffle, index = get_cls_batch(source=source, label=label, batch_size=8, index=index, vocab=vocab, fix_padding=40)
-
-# for small data size, you could read all of data in RAM.
-source_label = read_contents('./data/chat.txt', replace=' ', split='=')
-source, label = unzip_tuple(source_label)
-index = 0
-for i in range(110 * 3):
-    # eid is encoder input data
-    # eil is encoder input data length
-    # did is decoder input data
-    # dod is decoder output data
-    # dol is decoder output data length
-    eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, label, 256, index, vocab)
-    rainbow('shuffle:%r , index:%d' % (need_shuffle, index))
-    if (need_shuffle):
-        source, label = unzip_tuple(shuffle(source_label))
 ```
 
-##### We also have some colorful logging tools for you:
-normal, infor, warn, error and **rainbow**
+----
 
-If you choose the logging 'rainbow' it will looks like as follow:
+In **tf_common** module, we build lots of convenient tensorflow APIs and some preveiling NN blocks.
+e.g.:
+- *bahdanau_att, create bahdanau attention wrapper class.*
+- *dselfatt, createt self-attention for dynamic sequence length.*
+- *sselfatt, create self-attention for static sequence length.*
+- *bi_gru, create a bi-direction GRU cell list.*
+- *gelu & ngelu, gelu activation function from BERT and the one with normed operation.*
+- *...*
+- *...*
 
-![image](http://wx1.sinaimg.cn/large/65bb9c9cly1g5d2w5869vj21fq0faanu.jpg)
-
-### LUCKY FOR YOU.
+You can use `tf_common.flist()` to show all the functions and its' helping documents.
 
 ----
 
-### tc_common is a module for conveniently ref tensorflow base functions.
+Additionally, we have some lovely LOG functions for beautifying you command-line.
+- *gdu.normal*
+- *gdu.infor*
+- *gdu.warn*
+- *gdu.error*
 
-##### It will includes more and more high ensemble 'prevailing block', hold expectations pls.
+And some more fantastic LOG functions.
+- *gdu.scolor*
+- *gdu.lrandom*
+- *gdu.rainbow*
+
+Some of them will output information like the following:
+
+![LOG function](https://github.com/Raven-D/gdu/blob/master/assets/log.png?raw=true "LOG function")
 
 ----
-
-## [VOCAB]
-
-##### bvocab.data is the biggest vocab, chars - 21780
-##### mvocab.data is the medium size vocab, chars - 17429
-##### smvocab.data is the medium size vocab which less than mvocab.data, chars - 10509
-##### svocab.data is the smallest size vocab, chars - 6689
+#### Enjoy it and for good luck.
