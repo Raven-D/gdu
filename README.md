@@ -2,6 +2,9 @@
 * **gdu.py is a convenient functions tool for data processing.**
 * **tf_common.py is a high level and convenient wrapper for TensorFlow APIs, include some preveiling blocks.**
 
+DEMO1 - CLS: model.py & train.py
+DEMO2 - SEQ2SEQ: modelt.py & traint.py
+
 ----
 
 For using **GDU** module, you should follow these steps:
