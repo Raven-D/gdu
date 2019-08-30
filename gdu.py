@@ -359,7 +359,6 @@ def aug_text(text, prob, types_and_probs):
     if (np.random.randint(1, 101) < 100 * prob):
         type_prob = np.random.randint(1, 101) / 100.
         atype = tp_keys[get_section(type_prob, tp_values)]
-        # rainbow(atype)
         text = text.strip()
         text = list(text)
         tlen = len(text)
@@ -429,7 +428,7 @@ def split_list(arr):
 
 def unzip_tuple(tarr):
     '''
-    unzip a typle array, e.g.:[(1,2), (3,4) ... ]
+    unzip a typle array, e.g.:[(1,2), (3,4) ... ] => [1,3 ...], [2,4 ...]
     return 2 arrays for keys & values
     '''
     if (len(tarr) < 1):
@@ -748,7 +747,7 @@ def draw_diagram(key='', color='k-', lw=2):
         raise ValueError(error('NO VALID FILE FOUND (%s).' % key, time_tag=True, only_get=True))
 
 def test_case():
-    rainbow('TEST CASE')
+    infor('TEST CASE')
     # read vocab
     vocab = read_vocab('./data/vocab.data')
     rvocab = reverse_vocab(vocab)
@@ -769,7 +768,7 @@ def test_case():
     index = 0
     for i in range(500):
         eid, eil, did, dod, dol, need_shuffle, index = get_seq2seq_batch(source, label, 256, index, vocab)
-        rainbow('shuffle:%r , index:%d' % (need_shuffle, index))
+        normal('shuffle:%r , index:%d' % (need_shuffle, index))
         if (need_shuffle):
             source, label = unzip_tuple(shuffle(source_label))
 
