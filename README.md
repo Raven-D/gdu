@@ -3,6 +3,7 @@
 * **tf_common.py is a high level and convenient wrapper for TensorFlow APIs, include some preveiling blocks.**
 
 DEMO1 - CLS: model.py & train.py
+
 DEMO2 - SEQ2SEQ: modelt.py & traint.py
 
 ----
