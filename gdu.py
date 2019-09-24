@@ -255,11 +255,14 @@ def padding_array(arr, padding=0, padding_id=3, padding_type='after', convert_to
                 ar += [padding_id] * supp
             else:
                 ar = [padding_id] * supp + ar
-            arr[i] = ar
         elif (supp < 0):
             raise ValueError(error('PADDING COUNT < 0.', time_tag=True, only_get=True))
+        arr[i] = ar
     if (convert_to_numpy):
-        return np.array(arr, dtype=dtype)
+        try:
+            return np.array(arr, dtype=dtype)
+        except ValueError:
+            print [len(e) for e in arr]
     else:
         return arr
 

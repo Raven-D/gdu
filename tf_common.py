@@ -25,6 +25,7 @@ layer = tf.layers
 l2_loss = tf.nn.l2_loss
 ones = tf.ones
 zeros = tf.zeros
+concat = tf.concat
 
 # _sentinel=None, labels=None, logits=None, name=None
 sce = tf.nn.sparse_softmax_cross_entropy_with_logits
@@ -171,15 +172,15 @@ def bi_gru(num_units, num_layers, ac=tanh, dropout=0.0, mode='train', resc=0):
     return fw_gru_list, bw_gru_list
 
 def conv2d(filters, ksize=(3, 3), strides=(1, 1), padding='same',data_format='channels_last', dilation_rate=(1, 1), ac=lrelu, use_bias=True, name=None):
-    return layer.Conv2D(filters=filters, ksize=ksize, strides=strides, padding=padding, data_format=data_format, dilation_rate=dilation_rate, activation=ac, use_bias=use_bias, name=name)
+    return layer.Conv2D(filters=filters, kernel_size=ksize, strides=strides, padding=padding, data_format=data_format, dilation_rate=dilation_rate, activation=ac, use_bias=use_bias, name=name)
 
 def sepconv2d(filters, ksize=(3, 3), strides=(1, 1), padding='same', data_format='channels_last', dilation_rate=(1, 1), multiplier=1, ac=lrelu, use_bias=True, name=None):
     return layer.SeparableConv2D(filters=filters, kernel_size=ksize, strides=strides, padding=padding, data_format=data_format, dilation_rate=dilation_rate, depth_multiplier=multiplier, activation=ac, use_bias=use_bias, name=name)
 
-def maxpool2d(pool_size=(2, 2), strides=(1, 1), padding='same', format='channel_last', name=None):
+def maxpool2d(pool_size=(2, 2), strides=(1, 1), padding='same', format='channels_last', name=None):
     return layer.MaxPooling2D(pool_size=pool_size, strides=strides, padding=padding, data_format=format, name=name)
 
-def avgpool2d(pool_size=(2, 2), strides=(1, 1), padding='same', format='channel_last', name=None):
+def avgpool2d(pool_size=(2, 2), strides=(1, 1), padding='same', format='channels_last', name=None):
     return layer.AveragePooling2D(pool_size=pool_size, strides=strides, padding=padding, data_format=format, name=name)
 
 def dense(units, ac=lrelu, use_bias=True, name=None):
@@ -194,14 +195,14 @@ def moments(x, axes=-1, keep_dims=False):
 def emb_lookup(emb, source):
     return tf.nn.embedding_lookup(emb, source)
 
-def dselfatt(x, att_size, dropout_rate=0.0, res=True, mode='train'):
+def dselfatt(x, att_size, dropout_rate=0.0, ac=None, res=True, mode='train'):
     if (mode != 'train'):
         dropout_rate = 0.0
     g.infor('S-SELFATT DROPOUT:%.2f' % dropout_rate)
     xshape = tf.shape(x)
-    q = dense(att_size)(x)
-    k = dense(att_size)(x)
-    v = dense(att_size)(x)
+    q = dense(att_size, ac=ac)(x)
+    k = dense(att_size, ac=ac)(x)
+    v = dense(att_size, ac=ac)(x)
     s = tf.matmul(q, k, transpose_b=True)
     s = tf.multiply(s, 1.0 / tf.sqrt(tf.cast(att_size, tf.float32)))
     s = tf.nn.softmax(s, -1)
